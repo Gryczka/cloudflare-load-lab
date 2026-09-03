@@ -1,0 +1,59 @@
+{
+  "name": "cloudflare-load-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Global, self-hosted load testing powered by Cloudflare Containers.",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "dev:client": "vite --config vite.client.config.ts",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "cf-typegen": "wrangler types src/worker/env.d.ts",
+    "lint": "oxlint .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:go": "cd generator && go test ./...",
+    "test:cli": "node --test packages/cli/src/*.test.js",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run test:go && npm run test:cli && npm run build",
+    "deploy": "npm run check && wrangler deploy",
+    "db:migrate:local": "wrangler d1 migrations apply LOADLAB_DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply LOADLAB_DB --remote",
+    "capture:garden": "node scripts/capture-garden.mjs"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.7",
+    "@cloudflare/kumo": "^2.13.0",
+    "@phosphor-icons/react": "^2.1.10",
+    "echarts": "^6.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.54.3",
+    "@cloudflare/workers-types": "^5.20260903.1",
+    "@playwright/test": "^1.55.0",
+    "@tailwindcss/vite": "^4.1.14",
+    "@types/node": "^24.10.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "oxfmt": "^0.13.0",
+    "oxlint": "^1.29.0",
+    "tailwindcss": "^4.1.14",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2",
+    "vitest": "^4.0.8",
+    "wrangler": "^4.128.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

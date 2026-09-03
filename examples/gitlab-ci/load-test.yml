@@ -1,0 +1,18 @@
+performance:load:
+  image: node:24
+  stage: test
+  timeout: 15m
+  before_script:
+    - npm ci
+  script:
+    - node packages/cli/bin/loadlab.js run examples/configs/smoke.yml --wait --junit load-lab.xml --idempotency-key "$CI_PIPELINE_ID-$CI_JOB_ID"
+  variables:
+    LOADLAB_API_URL: $LOADLAB_API_URL
+  artifacts:
+    when: always
+    reports:
+      junit: load-lab.xml
+    paths:
+      - load-lab.xml
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

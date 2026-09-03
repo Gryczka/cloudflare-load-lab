@@ -1,0 +1,42 @@
+version: 1
+name: staging API smoke
+targetId: replace-with-verified-target-id
+
+tasks:
+  - name: health
+    method: GET
+    path: /api/health
+    headers: {}
+    expectedStatusMin: 200
+    expectedStatusMax: 299
+    thinkTimeMs: 0
+
+profile:
+  mode: arrival-rate
+  initialTarget: 2
+  maxVus: 30
+  stages:
+    - durationSeconds: 10
+      target: 10
+    - durationSeconds: 20
+      target: 10
+    - durationSeconds: 10
+      target: 2
+
+regions:
+  - code: ENAM
+    weight: 40
+    shards: 1
+  - code: WEUR
+    weight: 30
+    shards: 1
+  - code: APAC
+    weight: 30
+    shards: 1
+
+thresholds:
+  p95Ms: 500
+  errorRate: 0.01
+
+metadata:
+  environment: staging

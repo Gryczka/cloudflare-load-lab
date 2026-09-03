@@ -1,0 +1,45 @@
+version: 1
+name: checkout breakpoint
+targetId: replace-with-verified-target-id
+
+tasks:
+  - name: list products
+    method: GET
+    path: /api/products
+    headers: {}
+    expectedStatusMin: 200
+    expectedStatusMax: 299
+    thinkTimeMs: 100
+  - name: price quote
+    method: POST
+    path: /api/quote
+    body: '{"sku":"load-lab-fixture","quantity":1}'
+    headers:
+      Content-Type: application/json
+    expectedStatusMin: 200
+    expectedStatusMax: 299
+    thinkTimeMs: 250
+
+profile:
+  mode: virtual-users
+  initialTarget: 5
+  maxVus: 500
+  stages:
+    - { durationSeconds: 30, target: 50 }
+    - { durationSeconds: 60, target: 150 }
+    - { durationSeconds: 60, target: 300 }
+    - { durationSeconds: 30, target: 5 }
+
+regions:
+  - { code: ENAM, weight: 35, shards: 2 }
+  - { code: WNAM, weight: 15, shards: 1 }
+  - { code: WEUR, weight: 25, shards: 1 }
+  - { code: APAC, weight: 25, shards: 1 }
+
+thresholds:
+  p95Ms: 750
+  errorRate: 0.02
+
+metadata:
+  environment: staging
+  suite: checkout

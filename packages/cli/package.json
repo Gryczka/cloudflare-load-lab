@@ -1,0 +1,16 @@
+{
+  "name": "@gryczka/load-lab",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CLI for Cloudflare Load Lab",
+  "type": "module",
+  "bin": {
+    "loadlab": "./bin/loadlab.js"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,0 +1,138 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "cloudflare-load-lab",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-09-03",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "account_id": "2bbafcb44187c279aefca7e4afb00578",
+  "workers_dev": true,
+  "preview_urls": false,
+  "upload_source_maps": true,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "PUBLIC_DEMO_MODE": "true",
+    "DEMO_MAX_ACTIVE_RUNS": "2",
+    "DEMO_MAX_DAILY_RUNS": "30",
+    "CUSTOM_MAX_ACTIVE_RUNS": "4",
+    "MAX_ACTIVE_GENERATORS": "12",
+    "MAX_INSTANCES_PER_REGION": "4",
+    "ALLOWED_TARGET_HOSTS": "cloudflare-load-lab.dwarven.workers.dev",
+    "REPOSITORY_URL": "https://github.com/Gryczka/cloudflare-load-lab"
+  },
+  "d1_databases": [
+    {
+      "binding": "LOADLAB_DB",
+      "database_name": "cloudflare-load-lab",
+      "database_id": "99db3dd0-d5d4-4245-aad4-2f5d809bedae",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "LOADLAB_ARTIFACTS",
+      "bucket_name": "cloudflare-load-lab-artifacts"
+    }
+  ],
+  "ratelimits": [
+    {
+      "name": "RUN_RATE_LIMITER",
+      "namespace_id": "9101",
+      "simple": {
+        "limit": 1,
+        "period": 60
+      }
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "RUN_COORDINATOR", "class_name": "RunCoordinator" },
+      { "name": "BUDGET_COORDINATOR", "class_name": "BudgetCoordinator" },
+      { "name": "GENERATOR_ENAM", "class_name": "GeneratorENAM" },
+      { "name": "GENERATOR_WNAM", "class_name": "GeneratorWNAM" },
+      { "name": "GENERATOR_WEUR", "class_name": "GeneratorWEUR" },
+      { "name": "GENERATOR_EEUR", "class_name": "GeneratorEEUR" },
+      { "name": "GENERATOR_APAC", "class_name": "GeneratorAPAC" },
+      { "name": "GENERATOR_SAM", "class_name": "GeneratorSAM" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": [
+        "RunCoordinator",
+        "BudgetCoordinator",
+        "GeneratorENAM",
+        "GeneratorWNAM",
+        "GeneratorWEUR",
+        "GeneratorEEUR",
+        "GeneratorAPAC",
+        "GeneratorSAM"
+      ]
+    }
+  ],
+  "containers": [
+    {
+      "name": "loadlab-enam",
+      "class_name": "GeneratorENAM",
+      "image": "./generator/Dockerfile",
+      "image_build_context": "./generator",
+      "max_instances": 4,
+      "instance_type": "basic",
+      "constraints": { "regions": ["ENAM"] }
+    },
+    {
+      "name": "loadlab-wnam",
+      "class_name": "GeneratorWNAM",
+      "image": "./generator/Dockerfile",
+      "image_build_context": "./generator",
+      "max_instances": 4,
+      "instance_type": "basic",
+      "constraints": { "regions": ["WNAM"] }
+    },
+    {
+      "name": "loadlab-weur",
+      "class_name": "GeneratorWEUR",
+      "image": "./generator/Dockerfile",
+      "image_build_context": "./generator",
+      "max_instances": 4,
+      "instance_type": "basic",
+      "constraints": { "regions": ["WEUR"] }
+    },
+    {
+      "name": "loadlab-eeur",
+      "class_name": "GeneratorEEUR",
+      "image": "./generator/Dockerfile",
+      "image_build_context": "./generator",
+      "max_instances": 4,
+      "instance_type": "basic",
+      "constraints": { "regions": ["EEUR"] }
+    },
+    {
+      "name": "loadlab-apac",
+      "class_name": "GeneratorAPAC",
+      "image": "./generator/Dockerfile",
+      "image_build_context": "./generator",
+      "max_instances": 4,
+      "instance_type": "basic",
+      "constraints": { "regions": ["APAC"] }
+    },
+    {
+      "name": "loadlab-sam",
+      "class_name": "GeneratorSAM",
+      "image": "./generator/Dockerfile",
+      "image_build_context": "./generator",
+      "max_instances": 4,
+      "instance_type": "basic",
+      "constraints": { "regions": ["SAM"] }
+    }
+  ]
+}

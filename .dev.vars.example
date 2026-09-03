@@ -1,0 +1,2 @@
+# Required for custom (non-demo) targets. Generate with: openssl rand -hex 32
+ADMIN_TOKEN=replace-me

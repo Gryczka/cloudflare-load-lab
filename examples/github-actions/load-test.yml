@@ -1,0 +1,28 @@
+name: Performance gate
+
+on:
+  workflow_dispatch:
+  deployment_status:
+
+jobs:
+  load-test:
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Run global smoke test
+        run: node packages/cli/bin/loadlab.js run examples/configs/smoke.yml --wait --junit load-lab.xml --idempotency-key "$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+        env:
+          LOADLAB_API_URL: ${{ vars.LOADLAB_API_URL }}
+          LOADLAB_TOKEN: ${{ secrets.LOADLAB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: load-lab-report
+          path: load-lab.xml
