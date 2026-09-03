@@ -46,6 +46,8 @@ export {
   RunCoordinator,
 };
 
+const SERVICE_VERSION = "0.1.0";
+
 interface RunRow {
   id: string;
   name: string;
@@ -91,6 +93,7 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
     return json({
       ok: true,
       service: "cloudflare-load-lab",
+      version: SERVICE_VERSION,
       at: new Date().toISOString(),
     });
   }
