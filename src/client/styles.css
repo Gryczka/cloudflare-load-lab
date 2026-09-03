@@ -1139,6 +1139,47 @@ a {
   box-shadow: 0 6px 20px rgba(20, 27, 45, 0.035);
 }
 
+.chart-data-table {
+  grid-column: 1 / -1;
+  border: 1px solid var(--ll-line);
+  border-radius: 10px;
+  background: var(--ll-panel);
+  color: var(--ll-muted);
+  font-size: 10px;
+}
+
+.chart-data-table summary {
+  cursor: pointer;
+  padding: 11px 14px;
+  color: var(--ll-text);
+  font-weight: 650;
+}
+
+.chart-data-table .table-scroll {
+  max-height: 280px;
+  overflow: auto;
+  border-top: 1px solid var(--ll-line-soft);
+}
+
+.chart-data-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.chart-data-table th,
+.chart-data-table td {
+  border-bottom: 1px solid var(--ll-line-soft);
+  padding: 8px 14px;
+  text-align: left;
+}
+
+.chart-data-table th {
+  position: sticky;
+  top: 0;
+  background: var(--ll-panel);
+  color: var(--ll-text);
+}
+
 .chart-legend {
   display: flex;
   gap: 11px;

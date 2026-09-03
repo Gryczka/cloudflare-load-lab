@@ -99,6 +99,31 @@ export function RunCharts({
           ariaDescription={`Time-series chart of p95 latency with a ${p95Threshold} millisecond threshold.`}
         />
       </div>
+      <details className="chart-data-table">
+        <summary>View chart data as a table</summary>
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Time</th>
+                <th scope="col">Requests/s</th>
+                <th scope="col">Failed/s</th>
+                <th scope="col">p95 latency</th>
+              </tr>
+            </thead>
+            <tbody>
+              {points.map((point) => (
+                <tr key={point.timestamp}>
+                  <td>{new Date(point.timestamp).toLocaleTimeString()}</td>
+                  <td>{point.requests}</td>
+                  <td>{point.failedRequests}</td>
+                  <td>{point.p95Ms} ms</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
     </div>
   );
 }
