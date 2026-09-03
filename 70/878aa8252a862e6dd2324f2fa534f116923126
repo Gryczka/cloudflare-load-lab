@@ -1,0 +1,69 @@
+.gitignore
+  s_6b9b0c565b23a8::t_4d6687d036873f 1-13
+generator/.dockerignore
+  s_6b9b0c565b23a8::t_af20c85881fa0a 1-3
+generator/Dockerfile
+  s_6b9b0c565b23a8::t_c6f3b474332170 1-14
+generator/NOTICE
+  s_6b9b0c565b23a8::t_4ae4074eeee911 1-2
+generator/cmd/loadlab-agent/main.go
+  s_6b9b0c565b23a8::t_fed02d8493b1b1 1-30
+generator/go.mod
+  s_6b9b0c565b23a8::t_4f3884a29dbd31 1-3
+generator/internal/agent/agent.go
+  s_6b9b0c565b23a8::t_cd08a54217a1e0 1-448
+generator/internal/metrics/metrics.go
+  s_6b9b0c565b23a8::t_cd8ca0cac19692 1-210
+generator/internal/metrics/metrics_test.go
+  s_6b9b0c565b23a8::t_c07248670765ce 1-29
+generator/internal/script/script.go
+  s_6b9b0c565b23a8::t_36d776525909fd 1-134
+generator/internal/script/script_test.go
+  s_6b9b0c565b23a8::t_293072c530cb3e 1-34
+index.html
+  s_6b9b0c565b23a8::t_79c70a8f4bc045 1-17
+migrations/0001_init.sql
+  s_6b9b0c565b23a8::t_8ad097123cd577 1-26
+migrations/0002_idempotency.sql
+  s_c00dab85841fd4::t_cdc399a37ade19 1-8
+package-lock.json
+  s_eb44681c760bb9::t_844bc96ec0cad6 1-5912
+packages/cli/package.json
+  s_6b9b0c565b23a8::t_076dc77cfb3c85 1-16
+src/client/vite-env.d.ts
+  s_eb44681c760bb9::t_f117dcfcda3810 1
+tsconfig.json
+  s_6b9b0c565b23a8::t_adc029ab98a235 1-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "70878aa8252a862e6dd2324f2fa534f116923126",
+  "prompts": {},
+  "sessions": {
+    "s_6b9b0c565b23a8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f9b0be369ffegMFf0NSnI6nekU",
+        "model": "@cf/moonshotai/kimi-k2.7-code"
+      },
+      "human_author": "gryczka <pgryczka@cloudflare.com>"
+    },
+    "s_c00dab85841fd4": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f9b3678ebffeA3leaoPsNJUG4A",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "gryczka <pgryczka@cloudflare.com>"
+    },
+    "s_eb44681c760bb9": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_fa12c5d97ffeNHlpo2bh1367Uq",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "gryczka <pgryczka@cloudflare.com>"
+    }
+  }
+}
