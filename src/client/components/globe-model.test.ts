@@ -26,12 +26,12 @@ function assignment(
 describe("createGlobeMarkers", () => {
   it("positions reported locations using their geographic coordinates", () => {
     const [marker] = createGlobeMarkers([
-      assignment("generator-1", "ENAM", "IAD"),
+      assignment("generator-1", "ENAM", "iad01"),
     ]);
 
     expect(marker).toMatchObject({
-      id: "ENAM:IAD",
-      displayCode: "IAD",
+      id: "ENAM:IAD01",
+      displayCode: "IAD01",
       latitude: COLO_COORDINATES.IAD?.[0],
       longitude: COLO_COORDINATES.IAD?.[1],
       usesRegionalFallback: false,

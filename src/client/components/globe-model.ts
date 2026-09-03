@@ -52,9 +52,8 @@ export function createGlobeMarkers(
 
   return [...grouped.entries()].map(([id, group]) => {
     const region = REGIONS[group.code];
-    const coordinates = group.location
-      ? COLO_COORDINATES[group.location]
-      : undefined;
+    const metroCode = group.location?.match(/^[A-Z]{3}/)?.[0];
+    const coordinates = metroCode ? COLO_COORDINATES[metroCode] : undefined;
     return {
       id,
       code: group.code,
