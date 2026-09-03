@@ -27,8 +27,8 @@ export function Architecture({ capture = false }: { capture?: boolean }) {
               without multiplying load.
             </p>
           </div>
-          <Badge variant="orange" icon={<CubeIcon weight="fill" />}>
-            Cloudflare Containers
+          <Badge variant="orange" className="badge-with-icon">
+            <CubeIcon weight="fill" /> Cloudflare Containers
           </Badge>
         </div>
       )}
@@ -134,7 +134,7 @@ export function Architecture({ capture = false }: { capture?: boolean }) {
               <CubeIcon weight="fill" />
               <strong>Regional generator grid</strong>
             </div>
-            <Badge variant="green" appearance="dot">
+            <Badge variant="green" className="badge-with-dot">
               SCALE TO ZERO
             </Badge>
           </div>

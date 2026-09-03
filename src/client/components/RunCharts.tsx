@@ -88,9 +88,13 @@ export function RunCharts({
           height={235}
           isDarkMode={isDark}
           gradient
-          data={[{ name: "p95 latency", color: "#7b61ff", data: latency }]}
-          thresholds={[
-            { value: p95Threshold, label: "Threshold", color: "#d9485f" },
+          data={[
+            { name: "p95 latency", color: "#7b61ff", data: latency },
+            {
+              name: "Threshold",
+              color: "#d9485f",
+              data: latency.map(([timestamp]) => [timestamp, p95Threshold]),
+            },
           ]}
           yAxisName="ms"
           yAxisTickCount={4}

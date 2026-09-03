@@ -150,7 +150,10 @@ export function NewRun() {
             shard.
           </p>
         </div>
-        <Badge variant={ownerMode ? "green" : "orange"} appearance="dot">
+        <Badge
+          variant={ownerMode ? "green" : "orange"}
+          className="badge-with-dot"
+        >
           {ownerMode ? "Owner mode" : "Safe demo mode"}
         </Badge>
       </div>

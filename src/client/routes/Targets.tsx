@@ -102,8 +102,8 @@ export function Targets() {
             control.
           </p>
         </div>
-        <Badge variant="green" icon={<ShieldCheckIcon weight="fill" />}>
-          Deny by default
+        <Badge variant="green" className="badge-with-icon">
+          <ShieldCheckIcon weight="fill" /> Deny by default
         </Badge>
       </div>
 
@@ -238,7 +238,7 @@ export function Targets() {
                               ? "red"
                               : "orange"
                         }
-                        appearance="dot"
+                        className="badge-with-dot"
                       >
                         {target.status}
                       </Badge>

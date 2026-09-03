@@ -105,7 +105,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="topbar">
           <div className="topbar-left">
             <Sidebar.Trigger />
-            <Badge variant="orange" appearance="dot">
+            <Badge variant="orange" className="badge-with-dot">
               Cloudflare Containers
             </Badge>
           </div>

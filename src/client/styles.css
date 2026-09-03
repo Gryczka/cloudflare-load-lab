@@ -253,6 +253,26 @@ a {
   color: var(--ll-orange);
 }
 
+.badge-with-dot,
+.badge-with-icon {
+  gap: 5px;
+}
+
+.badge-with-dot::before {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+  opacity: 0.72;
+}
+
+.badge-with-icon svg {
+  width: 12px;
+  height: 12px;
+}
+
 .eyebrow {
   display: block;
   color: var(--ll-orange);

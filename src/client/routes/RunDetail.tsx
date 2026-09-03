@@ -310,7 +310,7 @@ export function RunDetail({
                             ? "orange"
                             : "green"
                       }
-                      appearance="dot"
+                      className="badge-with-dot"
                     >
                       {assignment.status}
                     </Badge>

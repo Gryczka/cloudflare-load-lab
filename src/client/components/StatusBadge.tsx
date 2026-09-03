@@ -28,7 +28,7 @@ const statusStyle: Record<
 export function StatusBadge({ status }: { status: RunStatus }) {
   const style = statusStyle[status];
   return (
-    <Badge variant={style.variant} appearance="dot">
+    <Badge variant={style.variant} className="badge-with-dot">
       {status.charAt(0).toUpperCase() + status.slice(1)}
     </Badge>
   );

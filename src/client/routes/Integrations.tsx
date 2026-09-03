@@ -66,8 +66,8 @@ export function Integrations() {
             workflows.
           </p>
         </div>
-        <Badge variant="purple" icon={<BracketsCurlyIcon weight="bold" />}>
-          API v1
+        <Badge variant="purple" className="badge-with-icon">
+          <BracketsCurlyIcon weight="bold" /> API v1
         </Badge>
       </div>
 
