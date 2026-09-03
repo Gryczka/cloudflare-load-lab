@@ -1,115 +1,97 @@
-import { useId } from "react";
-import { REGIONS, type RegionCode } from "../../shared/types";
-import type { AssignmentState } from "../../shared/api";
-
-type MapAssignment = Omit<AssignmentState, "token">;
-type MarkerStatus = "active" | "complete" | "error" | "idle";
+import { lazy, Suspense, useCallback, useId, useMemo, useState } from "react";
+import {
+  createGlobeMarkers,
+  describeGlobeMarkers,
+  type MapAssignment,
+} from "./globe-model";
 
 interface WorldMapProps {
   assignments: MapAssignment[];
   compact?: boolean;
 }
 
-function markerStatus(items: MapAssignment[]): MarkerStatus {
-  if (items.some((item) => item.status === "error")) return "error";
-  if (items.some((item) => ["ready", "running"].includes(item.status)))
-    return "active";
-  if (items.every((item) => item.status === "complete")) return "complete";
-  return "idle";
-}
-
-function actualLocations(items: MapAssignment[]): string[] {
-  return [
-    ...new Set(
-      items
-        .map((item) => item.placement?.location)
-        .filter((location): location is string => Boolean(location)),
-    ),
-  ];
-}
+const InteractiveGlobe = lazy(() =>
+  import("./InteractiveGlobe").then((module) => ({
+    default: module.InteractiveGlobe,
+  })),
+);
 
 export function WorldMap({ assignments, compact = false }: WorldMapProps) {
   const id = useId().replaceAll(":", "");
   const titleId = `globe-title-${id}`;
   const descriptionId = `globe-description-${id}`;
   const glowId = `globe-node-glow-${id}`;
-  const grouped = new Map<RegionCode, MapAssignment[]>();
-  for (const assignment of assignments) {
-    const existing = grouped.get(assignment.region) ?? [];
-    existing.push(assignment);
-    grouped.set(assignment.region, existing);
-  }
-
-  const placementDescription = [...grouped.entries()]
-    .map(([code, items]) => {
-      const locations = actualLocations(items);
-      const suffix = locations.length > 0 ? ` at ${locations.join(", ")}` : "";
-      return `${code}: ${items.length} generator${items.length === 1 ? "" : "s"}${suffix}`;
-    })
-    .join(". ");
+  const markers = useMemo(() => createGlobeMarkers(assignments), [assignments]);
+  const description = useMemo(() => describeGlobeMarkers(markers), [markers]);
+  const [interactiveReady, setInteractiveReady] = useState(false);
+  const [interactiveUnsupported, setInteractiveUnsupported] = useState(false);
+  const markReady = useCallback(() => setInteractiveReady(true), []);
+  const markUnsupported = useCallback(() => {
+    setInteractiveReady(false);
+    setInteractiveUnsupported(true);
+  }, []);
 
   return (
     <div className={`world-map ${compact ? "world-map-compact" : ""}`}>
-      <div className="globe-stage">
+      <div
+        className={`globe-stage ${interactiveReady ? "globe-interactive-ready" : ""}`}
+      >
         <svg
+          className="static-globe-layer"
           viewBox="0 0 100 57.11"
           role="img"
           aria-labelledby={`${titleId} ${descriptionId}`}
+          aria-hidden={interactiveReady || undefined}
         >
           <title id={titleId}>Regional generator placement globe</title>
-          <desc id={descriptionId}>
-            {placementDescription || "No regional generators are assigned."}
-          </desc>
+          <desc id={descriptionId}>{description}</desc>
           <defs>
             <radialGradient id={glowId}>
               <stop offset="0" stopColor="currentColor" stopOpacity=".42" />
               <stop offset="1" stopColor="currentColor" stopOpacity="0" />
             </radialGradient>
           </defs>
-          {[...grouped.entries()].map(([code, items]) => {
-            const region = REGIONS[code];
-            const status = markerStatus(items);
-            const locations = actualLocations(items);
-            return (
-              <g
-                key={code}
-                className={`region-node region-${status}`}
-                transform={`translate(${region.mapX} ${region.mapY})`}
-              >
-                <title>
-                  {region.label}: {items.length} generator
-                  {items.length === 1 ? "" : "s"}
-                  {locations.length > 0
-                    ? `; actual location ${locations.join(", ")}`
-                    : ""}
-                </title>
-                {status === "active" && (
-                  <circle
-                    r="3.7"
-                    className="region-pulse"
-                    fill={`url(#${glowId})`}
-                  />
-                )}
-                <circle r="1.45" className="region-dot" />
-                <circle r=".55" className="region-core" />
-                {!compact && (
-                  <text y="3.25" textAnchor="middle">
-                    {code}
-                  </text>
-                )}
-              </g>
-            );
-          })}
-          {!compact && (
-            <g className="map-control" transform="translate(52 28.5)">
-              <circle r="2.2" />
-              <path d="M-1 0h2M0-1v2" />
-              <text y="3.9" textAnchor="middle">
-                CONTROL
-              </text>
+          {markers.map((marker) => (
+            <g
+              key={marker.id}
+              className={`region-node region-${marker.status}`}
+              transform={`translate(${marker.fallbackX} ${marker.fallbackY})`}
+            >
+              <title>
+                {marker.label}: {marker.count} generator
+                {marker.count === 1 ? "" : "s"}
+                {marker.locations.length > 0
+                  ? `; actual location ${marker.locations.join(", ")}`
+                  : ""}
+              </title>
+              {marker.status === "active" && (
+                <circle
+                  r="3.7"
+                  className="region-pulse"
+                  fill={`url(#${glowId})`}
+                />
+              )}
+              <circle r="1.45" className="region-dot" />
+              <circle r=".55" className="region-core" />
+              {!compact && (
+                <text y="3.25" textAnchor="middle">
+                  {marker.displayCode}
+                </text>
+              )}
             </g>
-          )}
+          ))}
         </svg>
+        {!interactiveUnsupported && (
+          <Suspense fallback={null}>
+            <InteractiveGlobe
+              markers={markers}
+              description={description}
+              compact={compact}
+              onReady={markReady}
+              onUnsupported={markUnsupported}
+            />
+          </Suspense>
+        )}
       </div>
       <div className="map-legend">
         <span>
@@ -127,7 +109,7 @@ export function WorldMap({ assignments, compact = false }: WorldMapProps) {
           target="_blank"
           rel="noreferrer"
         >
-          Cloudflare network globe ↗
+          Cloudflare globe style ↗
         </a>
       </div>
     </div>

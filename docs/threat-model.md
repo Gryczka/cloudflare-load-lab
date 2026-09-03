@@ -5,7 +5,7 @@ Load generation is dual-use. The public deployment is designed to demonstrate or
 ## Enforced boundaries
 
 - Anonymous runs ignore client configuration and use a server-owned target, profile, and three-region distribution.
-- Custom runs require a high-entropy administrator Bearer token.
+- Custom runs require a high-entropy administrator Bearer token. Authenticated operators may apply a custom profile to the server-owned built-in target without adding an external origin.
 - Custom origins must use HTTPS and contain no path, query, fragment, or credentials.
 - Ownership verification uses a random challenge served from a well-known path and expires after 24 hours.
 - Operators may explicitly allow exact hostnames through `ALLOWED_TARGET_HOSTS` for controlled staging environments.

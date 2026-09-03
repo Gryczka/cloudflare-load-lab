@@ -16,6 +16,8 @@ export const REGIONS: Record<
     label: string;
     shortLabel: string;
     locationHint: string;
+    globeLatitude: number;
+    globeLongitude: number;
     mapX: number;
     mapY: number;
   }
@@ -24,6 +26,8 @@ export const REGIONS: Record<
     label: "Eastern North America",
     shortLabel: "E. North America",
     locationHint: "enam",
+    globeLatitude: 39,
+    globeLongitude: -77,
     mapX: 44,
     mapY: 18.5,
   },
@@ -31,6 +35,8 @@ export const REGIONS: Record<
     label: "Western North America",
     shortLabel: "W. North America",
     locationHint: "wnam",
+    globeLatitude: 37,
+    globeLongitude: -122,
     mapX: 33,
     mapY: 20,
   },
@@ -38,6 +44,8 @@ export const REGIONS: Record<
     label: "Western Europe",
     shortLabel: "W. Europe",
     locationHint: "weur",
+    globeLatitude: 50,
+    globeLongitude: 5,
     mapX: 66,
     mapY: 13.5,
   },
@@ -45,6 +53,8 @@ export const REGIONS: Record<
     label: "Eastern Europe",
     shortLabel: "E. Europe",
     locationHint: "eeur",
+    globeLatitude: 52,
+    globeLongitude: 21,
     mapX: 72,
     mapY: 13,
   },
@@ -52,6 +62,8 @@ export const REGIONS: Record<
     label: "Asia Pacific",
     shortLabel: "Asia Pacific",
     locationHint: "apac",
+    globeLatitude: 1.35,
+    globeLongitude: 103.82,
     mapX: 80,
     mapY: 20,
   },
@@ -59,6 +71,8 @@ export const REGIONS: Record<
     label: "South America",
     shortLabel: "South America",
     locationHint: "sam",
+    globeLatitude: -23.55,
+    globeLongitude: -46.63,
     mapX: 53,
     mapY: 42.5,
   },

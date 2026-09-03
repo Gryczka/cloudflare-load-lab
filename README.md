@@ -23,7 +23,8 @@ Load Lab takes one declarative traffic budget, partitions it exactly across regi
 - Atomic global and per-region generator capacity reservations
 - Bounded public demo and owner-only custom runs
 - Target ownership challenge plus per-Container hostname allowlists
-- Kumo React dashboard, configuration wizard, target manager, and architecture view
+- Kumo React dashboard with a mouse, touch, and keyboard-rotatable placement globe
+- Configuration wizard, target manager, and architecture view
 - YAML/JSON CLI with JUnit output, idempotency keys, GitHub Actions, and GitLab CI examples
 
 ## Architecture
@@ -47,7 +48,7 @@ RunCoordinator Durable Object
                     └── one-second metric batches ──► Worker ──► coordinator
 ```
 
-Placement is regional, not exact-city synthetic monitoring. The UI always separates the requested pool from `CLOUDFLARE_REGION` and `CLOUDFLARE_LOCATION` reported by the actual Container. Results represent Cloudflare's network, not residential last-mile conditions.
+Placement is regional, not exact-city synthetic monitoring. The UI always separates the requested pool from `CLOUDFLARE_REGION` and `CLOUDFLARE_LOCATION` reported by the actual Container. The globe plots reported location codes at their geographic coordinates when known and uses an explicitly described regional representative point while placement is pending or a new code is unknown. Results represent Cloudflare's network, not residential last-mile conditions.
 
 See [docs/architecture.md](docs/architecture.md) and [docs/threat-model.md](docs/threat-model.md).
 
@@ -160,6 +161,8 @@ thresholds:
 ```
 
 `arrival-rate` targets iterations per second. Each iteration executes every listed task, so a flow with three tasks can produce up to three HTTP requests per iteration.
+
+Authenticated web runs may keep `targetId: demo` to exercise a custom load shape safely against the deployment's built-in owned endpoint. Without an applied administrator token, the web UI submits the fixed bounded public demo rather than the editable draft.
 
 ## CLI and CI
 

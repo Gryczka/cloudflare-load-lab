@@ -26,6 +26,8 @@ try {
   await page.goto("http://127.0.0.1:4174/preview", {
     waitUntil: "networkidle",
   });
+  await page.waitForSelector(".globe-interactive-ready");
+  await page.waitForTimeout(250);
   await page.screenshot({ path: path.join(output, "cloudflare-load-lab.png") });
 
   await page.setViewportSize({ width: 1790, height: 1070 });

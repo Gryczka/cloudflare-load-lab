@@ -25,6 +25,7 @@ import {
   type RegionCode,
 } from "../../shared/types";
 import { api, getAdminToken, setAdminToken } from "../lib/api";
+import { selectRunSubmission } from "../lib/run-submission";
 
 type Target = { id: string; origin: string; status: string };
 
@@ -43,23 +44,36 @@ export function NewRun() {
     "WEUR",
     "APAC",
   ]);
-  const [token, setToken] = useState(getAdminToken());
+  const [appliedToken, setAppliedToken] = useState(getAdminToken);
+  const [token, setToken] = useState(appliedToken);
   const [targets, setTargets] = useState<Target[]>([]);
   const [targetId, setTargetId] = useState("demo");
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!token) return;
+    if (!appliedToken) {
+      setTargets([]);
+      setTargetId("demo");
+      return;
+    }
+    let current = true;
     api
       .targets()
-      .then((response) =>
-        setTargets(
-          response.targets.filter((target) => target.status === "verified"),
-        ),
-      )
-      .catch(() => setTargets([]));
-  }, [token]);
+      .then((response) => {
+        if (current) {
+          setTargets(
+            response.targets.filter((target) => target.status === "verified"),
+          );
+        }
+      })
+      .catch(() => {
+        if (current) setTargets([]);
+      });
+    return () => {
+      current = false;
+    };
+  }, [appliedToken]);
 
   const configResult = useMemo(() => {
     const ramp = Math.max(1, Math.floor(duration * 0.25));
@@ -100,8 +114,14 @@ export function NewRun() {
     });
   }, [duration, errorRate, mode, name, p95, path, peak, regions, targetId]);
   const config = configResult.success ? configResult.data : DEMO_RUN_CONFIG;
-  const estimate = estimateRun(config);
-  const ownerMode = Boolean(token && targetId !== "demo");
+  const submission = selectRunSubmission(appliedToken, config);
+  const ownerMode = submission.mode === "custom";
+  const submittedConfig = submission.config;
+  const estimate = estimateRun(submittedConfig);
+  const submittedPeak = Math.max(
+    submittedConfig.profile.initialTarget,
+    ...submittedConfig.profile.stages.map((stage) => stage.target),
+  );
 
   function toggleRegion(code: RegionCode) {
     setRegions((current) =>
@@ -114,8 +134,11 @@ export function NewRun() {
   }
 
   function saveToken() {
-    setAdminToken(token.trim());
-    setToken(token.trim());
+    const nextToken = token.trim();
+    setAdminToken(nextToken);
+    setToken(nextToken);
+    setAppliedToken(nextToken);
+    setError("");
   }
 
   async function submit() {
@@ -162,7 +185,7 @@ export function NewRun() {
         <Banner
           icon={<ShieldCheckIcon weight="fill" />}
           title="The public garden runs a bounded scenario"
-          description="Add the deployment's administrator token and a verified target to run this custom plan. Without it, the button launches a safe 20-second test against Load Lab itself."
+          description="The form is a custom-plan draft until you apply the administrator token. Without it, the button submits the fixed 20-second, three-region demo capped at 15 iterations per second."
         />
       )}
 
@@ -184,7 +207,7 @@ export function NewRun() {
                 value={targetId}
                 onValueChange={(value) => setTargetId(value ?? "demo")}
                 items={{
-                  demo: "Owned demo endpoint",
+                  demo: "Load Lab owned endpoint",
                   ...Object.fromEntries(
                     targets.map((target) => [target.id, target.origin]),
                   ),
@@ -319,8 +342,10 @@ export function NewRun() {
         <aside className="review-column">
           <LayerCard className="review-card">
             <div className="review-header">
-              <span className="eyebrow">PLAN REVIEW</span>
-              <Badge variant="neutral">v1</Badge>
+              <span className="eyebrow">
+                {ownerMode ? "PLAN REVIEW" : "FIXED DEMO REVIEW"}
+              </span>
+              <Badge variant="neutral">{ownerMode ? "Custom" : "Public"}</Badge>
             </div>
             <ReviewLine
               icon={CubeIcon}
@@ -330,7 +355,7 @@ export function NewRun() {
             <ReviewLine
               icon={GaugeIcon}
               label="Peak global load"
-              value={`${peak} ${mode === "arrival-rate" ? "iter/s" : "VUs"}`}
+              value={`${submittedPeak} ${submittedConfig.profile.mode === "arrival-rate" ? "iter/s" : "VUs"}`}
             />
             <ReviewLine
               icon={ArrowRightIcon}
@@ -339,11 +364,11 @@ export function NewRun() {
             />
             <div className="distribution-review">
               <span>Distribution</span>
-              {regions.map((region) => (
-                <div key={region}>
-                  <strong>{region}</strong>
-                  <i style={{ width: `${100 / regions.length}%` }} />
-                  <small>{Math.round(100 / regions.length)}%</small>
+              {submittedConfig.regions.map((region) => (
+                <div key={region.code}>
+                  <strong>{region.code}</strong>
+                  <i style={{ width: `${region.weight}%` }} />
+                  <small>{Math.round(region.weight)}%</small>
                 </div>
               ))}
             </div>
@@ -351,8 +376,9 @@ export function NewRun() {
             <div className="cost-note">
               <ShieldCheckIcon />
               <span>
-                Compute is billed only while shards are active. This plan is
-                always checked against server-side caps.
+                {ownerMode
+                  ? "Compute is billed only while shards are active. This plan is always checked against server-side caps."
+                  : "Your edited fields are not sent in safe demo mode. Apply the administrator token to submit custom regions and load targets."}
               </span>
             </div>
             {error && <p className="inline-error">{error}</p>}

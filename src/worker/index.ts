@@ -33,6 +33,7 @@ import {
   readJson,
   withSecurityHeaders,
 } from "./http";
+import { resolveBuiltInTarget } from "./target-policy";
 
 export {
   BudgetCoordinator,
@@ -46,7 +47,7 @@ export {
   RunCoordinator,
 };
 
-const SERVICE_VERSION = "0.1.0";
+const SERVICE_VERSION = "0.1.1";
 
 interface RunRow {
   id: string;
@@ -227,7 +228,11 @@ async function createRun(
         parsed.error.flatten(),
       );
     config = parsed.data;
-    targetOrigin = await resolveTarget(config, env);
+    targetOrigin = await resolveTarget(
+      config,
+      env,
+      containerReachableOrigin(url),
+    );
     enforceCustomLimits(config);
   }
 
@@ -490,20 +495,28 @@ async function listTargets(env: Env): Promise<Response> {
   });
 }
 
-async function resolveTarget(config: RunConfig, env: Env): Promise<string> {
-  if (config.targetId !== "demo") {
-    const target = await env.LOADLAB_DB.prepare(
-      `SELECT origin, status, expires_at FROM targets WHERE id = ?`,
-    )
-      .bind(config.targetId)
-      .first<Pick<TargetRow, "origin" | "status" | "expires_at">>();
-    if (
-      target?.status === "verified" &&
-      target.expires_at &&
-      target.expires_at > new Date().toISOString()
-    ) {
-      return target.origin;
-    }
+async function resolveTarget(
+  config: RunConfig,
+  env: Env,
+  builtInTargetOrigin: string,
+): Promise<string> {
+  const builtInTarget = resolveBuiltInTarget(
+    config.targetId,
+    builtInTargetOrigin,
+  );
+  if (builtInTarget) return builtInTarget;
+
+  const target = await env.LOADLAB_DB.prepare(
+    `SELECT origin, status, expires_at FROM targets WHERE id = ?`,
+  )
+    .bind(config.targetId)
+    .first<Pick<TargetRow, "origin" | "status" | "expires_at">>();
+  if (
+    target?.status === "verified" &&
+    target.expires_at &&
+    target.expires_at > new Date().toISOString()
+  ) {
+    return target.origin;
   }
 
   if (config.targetOrigin) {

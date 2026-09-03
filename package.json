@@ -1,6 +1,6 @@
 {
   "name": "cloudflare-load-lab",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "Global, self-hosted load testing powered by Cloudflare Containers.",
   "type": "module",
@@ -34,6 +34,7 @@
     "echarts": "^6.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "three": "^0.180.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
@@ -44,6 +45,7 @@
     "@types/node": "^24.10.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "@types/three": "^0.180.0",
     "@vitejs/plugin-react": "^5.0.4",
     "oxfmt": "^0.13.0",
     "oxlint": "^1.29.0",

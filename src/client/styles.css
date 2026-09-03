@@ -440,11 +440,16 @@ a {
 }
 
 .globe-stage {
+  position: relative;
   overflow: hidden;
+  width: 100%;
+  max-height: 390px;
   margin-top: 8px;
+  aspect-ratio: 100 / 57.11;
   border-radius: 10px;
   background: #fffbf5 url("./assets/cloudflare-network-globe.png") center / 100% 100%
     no-repeat;
+  isolation: isolate;
 }
 
 [data-mode="dark"] .globe-stage {
@@ -452,15 +457,27 @@ a {
   background-image: url("./assets/cloudflare-network-globe-dark.png");
 }
 
-.world-map svg {
-  display: block;
-  width: 100%;
-  max-height: 390px;
-  color: var(--ll-orange);
+.globe-stage.globe-interactive-ready {
+  background-image: none;
 }
 
-.region-node text,
-.map-control text {
+.static-globe-layer {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--ll-orange);
+  transition: opacity 180ms ease;
+}
+
+.globe-interactive-ready .static-globe-layer {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.region-node text {
   fill: var(--ll-text);
   stroke: var(--ll-panel-solid);
   stroke-width: 0.35px;
@@ -511,15 +528,151 @@ a {
   fill: var(--ll-red);
 }
 
-.map-control circle {
-  fill: var(--ll-panel-solid);
-  stroke: var(--ll-purple);
-  stroke-width: 0.42;
+.interactive-globe {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 180ms ease;
 }
 
-.map-control path {
-  stroke: var(--ll-purple);
-  stroke-width: 0.42;
+.globe-interactive-ready .interactive-globe {
+  opacity: 1;
+}
+
+.interactive-globe-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  outline: none;
+  touch-action: pan-y;
+}
+
+.interactive-globe-canvas:hover {
+  cursor: grab;
+}
+
+.interactive-globe-canvas.is-dragging {
+  cursor: grabbing;
+}
+
+.interactive-globe-canvas:focus-visible {
+  outline: 2px solid var(--ll-purple);
+  outline-offset: -3px;
+}
+
+.globe-marker-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.globe-marker {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  color: var(--ll-orange);
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
+  transform: translate(-50%, -50%);
+  transition:
+    opacity 80ms linear,
+    visibility 80ms linear;
+  will-change: top, left;
+}
+
+.globe-marker strong {
+  margin-top: 2px;
+  color: var(--ll-text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-shadow:
+    -1px -1px 0 var(--ll-panel-solid),
+    1px -1px 0 var(--ll-panel-solid),
+    -1px 1px 0 var(--ll-panel-solid),
+    1px 1px 0 var(--ll-panel-solid);
+}
+
+.globe-marker-pin {
+  position: relative;
+  display: block;
+  width: 15px;
+  height: 15px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  background: var(--ll-panel-solid);
+  box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 25%, transparent);
+}
+
+.globe-marker-pin::after {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+  inset: 2px;
+}
+
+.globe-marker-active .globe-marker-pin::before {
+  position: absolute;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  content: "";
+  inset: -7px;
+  animation: map-pulse 2.3s ease-out infinite;
+}
+
+.globe-marker-complete {
+  color: var(--ll-green);
+}
+
+.globe-marker-idle {
+  color: var(--ll-muted);
+}
+
+.globe-marker-error {
+  color: var(--ll-red);
+}
+
+.globe-interaction-hint {
+  position: absolute;
+  z-index: 3;
+  bottom: 10px;
+  left: 10px;
+  display: flex;
+  gap: 8px;
+  border: 1px solid color-mix(in srgb, var(--ll-line) 75%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ll-panel-solid) 86%, transparent);
+  padding: 5px 8px;
+  color: var(--ll-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 8px;
+  line-height: 1;
+  backdrop-filter: blur(8px);
+}
+
+.globe-interaction-hint span + span::before {
+  margin-right: 8px;
+  color: var(--ll-line);
+  content: "·";
+}
+
+.globe-reset-control {
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  right: 10px;
+}
+
+.world-map-compact .globe-reset-control {
+  top: 6px;
+  right: 6px;
 }
 
 .map-legend {
