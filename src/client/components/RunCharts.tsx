@@ -2,9 +2,11 @@ import { TimeseriesChart } from "@cloudflare/kumo/components/chart";
 import { BarChart, LineChart } from "echarts/charts";
 import {
   AriaComponent,
+  BrushComponent,
   GridComponent,
   LegendComponent,
   MarkLineComponent,
+  ToolboxComponent,
   TooltipComponent,
 } from "echarts/components";
 import * as echarts from "echarts/core";
@@ -16,6 +18,8 @@ echarts.use([
   BarChart,
   GridComponent,
   TooltipComponent,
+  BrushComponent,
+  ToolboxComponent,
   LegendComponent,
   MarkLineComponent,
   AriaComponent,

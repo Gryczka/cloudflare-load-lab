@@ -199,4 +199,4 @@ The generator consumes k6's JSON point output into fixed latency buckets. Fixed 
 
 ## License and dependencies
 
-Original Load Lab source is MIT licensed. The Container image includes unmodified [Grafana k6](https://github.com/grafana/k6), distributed under AGPL-3.0; see `generator/NOTICE` and comply with its distribution terms. The UI uses Cloudflare's `@cloudflare/kumo` package.
+Original Load Lab source is MIT licensed. The Container image includes unmodified [Grafana k6](https://github.com/grafana/k6), distributed under AGPL-3.0; see `generator/NOTICE` and comply with its distribution terms. The UI uses Cloudflare's `@cloudflare/kumo` package and locally vendors Cloudflare's published network-globe artwork. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

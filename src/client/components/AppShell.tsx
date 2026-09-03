@@ -33,9 +33,14 @@ const navigation = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = window.location.pathname;
-  const [dark, setDark] = useState(
-    () => localStorage.getItem("loadlab-theme") === "dark",
-  );
+  const [dark, setDark] = useState(() => {
+    const storedMode = localStorage.getItem("loadlab-theme");
+    return (
+      storedMode === "dark" ||
+      (storedMode === null &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches)
+    );
+  });
 
   useEffect(() => {
     document.documentElement.dataset.mode = dark ? "dark" : "light";

@@ -439,37 +439,42 @@ a {
   min-width: 0;
 }
 
+.globe-stage {
+  overflow: hidden;
+  margin-top: 8px;
+  border-radius: 10px;
+  background: #fffbf5 url("./assets/cloudflare-network-globe.png") center / 100% 100%
+    no-repeat;
+}
+
+[data-mode="dark"] .globe-stage {
+  background-color: #101010;
+  background-image: url("./assets/cloudflare-network-globe-dark.png");
+}
+
 .world-map svg {
   display: block;
   width: 100%;
   max-height: 390px;
-  overflow: visible;
   color: var(--ll-orange);
-}
-
-.map-grid-line {
-  stroke: var(--ll-line);
-}
-
-.map-land {
-  fill: color-mix(in srgb, var(--ll-muted) 12%, transparent);
-  stroke: color-mix(in srgb, var(--ll-muted) 38%, transparent);
-  stroke-width: 0.28;
 }
 
 .region-node text,
 .map-control text {
-  fill: var(--ll-muted);
+  fill: var(--ll-text);
+  stroke: var(--ll-panel-solid);
+  stroke-width: 0.35px;
+  paint-order: stroke;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 2.2px;
-  font-weight: 800;
+  font-size: 1.45px;
+  font-weight: 850;
   letter-spacing: 0.08em;
 }
 
 .region-dot {
-  fill: var(--ll-orange-soft);
+  fill: var(--ll-panel-solid);
   stroke: var(--ll-orange);
-  stroke-width: 0.6;
+  stroke-width: 0.42;
 }
 
 .region-core {
@@ -477,8 +482,8 @@ a {
 }
 
 .region-pulse {
-  fill: url(#mapGlow);
   transform-origin: center;
+  transform-box: fill-box;
   animation: map-pulse 2.3s ease-out infinite;
 }
 
@@ -488,6 +493,14 @@ a {
 
 .region-complete .region-core {
   fill: var(--ll-green);
+}
+
+.region-idle .region-dot {
+  stroke: var(--ll-muted);
+}
+
+.region-idle .region-core {
+  fill: var(--ll-muted);
 }
 
 .region-error .region-dot {
@@ -501,18 +514,19 @@ a {
 .map-control circle {
   fill: var(--ll-panel-solid);
   stroke: var(--ll-purple);
-  stroke-width: 0.55;
+  stroke-width: 0.42;
 }
 
 .map-control path {
   stroke: var(--ll-purple);
-  stroke-width: 0.6;
+  stroke-width: 0.42;
 }
 
 .map-legend {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 8px 16px;
   border-top: 1px solid var(--ll-line-soft);
   padding: 10px 2px 0;
   color: var(--ll-muted);
@@ -539,10 +553,20 @@ a {
   background: var(--ll-green);
 }
 
+.legend-idle {
+  background: var(--ll-muted);
+}
+
 .map-attribution {
   margin-left: auto;
+  color: inherit;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.map-attribution:hover {
+  color: var(--ll-orange);
 }
 
 .metrics-row {
