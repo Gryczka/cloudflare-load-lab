@@ -1,0 +1,49 @@
+docs/architecture.md
+  s_bad723b0bf1dd0::t_140a4e47492f35 34
+package-lock.json
+  s_92810b25a546e7::t_12faa6b5aae986 3,9
+package.json
+  s_92810b25a546e7::t_86b6fc32ed079a 3
+src/client/components/InteractiveGlobe.tsx
+  s_9c0cb4a45ae835::t_cba5a7b9172c95 6,8,220-227,244-247,252-269,420-424,426-432,434-441
+src/client/components/WorldMap.tsx
+  s_bad723b0bf1dd0::t_f05a5f3ac0b2f1 7,51,53-55,63-65,67-72,77-90,117-120
+src/client/components/globe-label-layout.test.ts
+  s_9c0cb4a45ae835::t_78172d273215fe 1-53
+src/shared/request-rate.ts
+  s_bad723b0bf1dd0::t_21d188fea3d23c 1-35
+src/worker/index.ts
+  s_92810b25a546e7::t_f938784a6778a1 50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.10",
+  "base_commit_sha": "3d0e9bff0317f3cc4656b96a79f966e2c4e0a21d",
+  "prompts": {},
+  "sessions": {
+    "s_92810b25a546e7": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7e7c6835ffeJWy6mDIGjN21EH",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "gryczka <pgryczka@cloudflare.com>"
+    },
+    "s_9c0cb4a45ae835": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f7e8a0706ffevpKQ4LF2tfsJAK",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "gryczka <pgryczka@cloudflare.com>"
+    },
+    "s_bad723b0bf1dd0": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_f9e6d2ef9ffeqcNEXLAtyphTMa",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "gryczka <pgryczka@cloudflare.com>"
+    }
+  }
+}
