@@ -4,6 +4,7 @@ import { COLO_COORDINATES } from "../data/colo-coordinates";
 
 export type MapAssignment = Omit<AssignmentState, "token">;
 export type MarkerStatus = "active" | "complete" | "error" | "idle";
+export type TrafficLevel = "none" | "low" | "medium" | "high" | "surge";
 
 export interface GlobeMarker {
   id: string;
@@ -17,6 +18,9 @@ export interface GlobeMarker {
   count: number;
   locations: string[];
   status: MarkerStatus;
+  requestRate: number;
+  trafficIntensity: number;
+  trafficLevel: TrafficLevel;
   usesRegionalFallback: boolean;
 }
 
@@ -24,6 +28,19 @@ interface AssignmentGroup {
   code: RegionCode;
   location?: string;
   assignments: MapAssignment[];
+}
+
+export function requestTrafficLevel(requestRate: number): TrafficLevel {
+  if (requestRate <= 0) return "none";
+  if (requestRate < 10) return "low";
+  if (requestRate < 50) return "medium";
+  if (requestRate < 200) return "high";
+  return "surge";
+}
+
+export function requestTrafficIntensity(requestRate: number): number {
+  if (requestRate <= 0) return 0;
+  return Math.min(1, Math.log2(requestRate + 1) / 10);
 }
 
 function markerStatus(items: MapAssignment[]): MarkerStatus {
@@ -54,6 +71,10 @@ export function createGlobeMarkers(
     const region = REGIONS[group.code];
     const metroCode = group.location?.match(/^[A-Z]{3}/)?.[0];
     const coordinates = metroCode ? COLO_COORDINATES[metroCode] : undefined;
+    const requestRate = group.assignments.reduce(
+      (sum, assignment) => sum + Math.max(0, assignment.requestRate ?? 0),
+      0,
+    );
     return {
       id,
       code: group.code,
@@ -66,6 +87,9 @@ export function createGlobeMarkers(
       count: group.assignments.length,
       locations: group.location ? [group.location] : [],
       status: markerStatus(group.assignments),
+      requestRate,
+      trafficIntensity: requestTrafficIntensity(requestRate),
+      trafficLevel: requestTrafficLevel(requestRate),
       usesRegionalFallback: Boolean(group.location && !coordinates),
     };
   });
@@ -81,7 +105,11 @@ export function describeGlobeMarkers(markers: GlobeMarker[]): string {
       const fallback = marker.usesRegionalFallback
         ? "; shown at the regional representative point"
         : "";
-      return `${marker.code}${placement}: ${marker.count} generator${marker.count === 1 ? "" : "s"}${fallback}`;
+      const traffic =
+        marker.requestRate > 0
+          ? `; ${marker.requestRate.toLocaleString()} requests per second`
+          : "";
+      return `${marker.code}${placement}: ${marker.count} generator${marker.count === 1 ? "" : "s"}${fallback}${traffic}`;
     })
     .join(". ");
 }

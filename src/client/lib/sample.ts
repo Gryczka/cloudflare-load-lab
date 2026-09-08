@@ -45,6 +45,7 @@ export const SAMPLE_RUN: RunSnapshot = {
       profile: DEMO_RUN_CONFIG.profile,
       id: "sample-enam",
       status: "complete",
+      requestRate: 0,
       lastSequence: 20,
       lastHeartbeat: new Date(started.getTime() + 20_000).toISOString(),
       placement: {
@@ -61,6 +62,7 @@ export const SAMPLE_RUN: RunSnapshot = {
       profile: DEMO_RUN_CONFIG.profile,
       id: "sample-weur",
       status: "complete",
+      requestRate: 0,
       lastSequence: 20,
       lastHeartbeat: new Date(started.getTime() + 20_000).toISOString(),
       placement: {
@@ -77,6 +79,7 @@ export const SAMPLE_RUN: RunSnapshot = {
       profile: DEMO_RUN_CONFIG.profile,
       id: "sample-apac",
       status: "complete",
+      requestRate: 0,
       lastSequence: 20,
       lastHeartbeat: new Date(started.getTime() + 20_000).toISOString(),
       placement: {
@@ -125,3 +128,32 @@ export const SAMPLE_RUN: RunSnapshot = {
   ],
   reportReady: true,
 };
+
+const FABRIC_NODES = [
+  ["ENAM", "atl08", "US", 6],
+  ["WNAM", "lax09", "US", 18],
+  ["WEUR", "ams01", "NL", 34],
+  ["EEUR", "rix01", "LV", 82],
+  ["APAC", "sin05", "SG", 240],
+  ["SAM", "gig11", "BR", 11],
+] as const;
+
+export const FABRIC_ASSIGNMENTS: RunSnapshot["assignments"] = FABRIC_NODES.map(
+  ([region, location, country, requestRate], index) => ({
+    region,
+    shard: 0,
+    weight: 100 / FABRIC_NODES.length,
+    profile: DEMO_RUN_CONFIG.profile,
+    id: `fabric-${region.toLowerCase()}`,
+    status: "running",
+    requestRate,
+    lastSequence: 16 + index,
+    lastHeartbeat: new Date(started.getTime() + 16_000).toISOString(),
+    placement: {
+      requestedRegion: region,
+      actualRegion: region,
+      location,
+      country,
+    },
+  }),
+);

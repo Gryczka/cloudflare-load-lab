@@ -31,7 +31,7 @@ The run coordinator starts each Container, programs an exact outbound hostname a
 
 The non-root Go agent owns the k6 child process and exposes only fixed control endpoints. It generates JavaScript from the validated declarative task model; users cannot provide shell arguments. k6 emits JSON points to an ephemeral file, which the agent tails into one-second deltas.
 
-Latency points enter fixed buckets. Counters and bucket counts sum in the Durable Object. Gauges such as active VUs replace the prior value for each assignment. Duplicate batches are discarded by assignment sequence number.
+Latency points enter fixed buckets. Counters and bucket counts sum in the Durable Object. Gauges such as active VUs replace the prior value for each assignment. The latest fresh request delta is normalized by its metric interval, remains attached to its assignment, and drives the placement map's rate-scaled pulse; it expires after 3.5 seconds without another batch so stalled nodes do not appear active. Duplicate batches are discarded by assignment sequence number.
 
 ## Completion and failure
 

@@ -498,12 +498,39 @@ a {
   fill: var(--ll-orange);
 }
 
-.region-pulse {
-  transform-origin: center;
+.region-traffic-pulses circle {
+  fill: none;
+  stroke: var(--ll-orange);
+  stroke-width: 0.32;
+  opacity: 0;
   transform-box: fill-box;
-  animation: map-pulse 2.3s ease-out infinite;
+  transform-origin: center;
+  animation: traffic-node-pulse var(--traffic-pulse-duration) ease-out infinite;
 }
 
+.region-traffic-pulses circle:nth-child(2) {
+  animation-delay: calc(var(--traffic-pulse-duration) * -0.34);
+}
+
+.region-traffic-pulses circle:nth-child(3) {
+  animation-delay: calc(var(--traffic-pulse-duration) * -0.68);
+}
+
+.region-traffic-low .region-traffic-pulses circle:nth-child(n + 2),
+.region-traffic-medium .region-traffic-pulses circle:nth-child(3) {
+  display: none;
+}
+
+.region-traffic-surge .region-traffic-pulses circle {
+  stroke-width: 0.48;
+}
+
+.region-node .region-request-rate {
+  fill: var(--ll-orange);
+  stroke-width: 0.3px;
+  font-size: 1.05px;
+  letter-spacing: 0.02em;
+}
 .region-complete .region-dot {
   stroke: var(--ll-green);
 }
@@ -571,8 +598,9 @@ a {
 
 .globe-marker {
   position: absolute;
-  display: grid;
-  justify-items: center;
+  display: block;
+  width: 15px;
+  height: 15px;
   color: var(--ll-orange);
   filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2));
   transform: translate(-50%, -50%);
@@ -582,8 +610,23 @@ a {
   will-change: top, left;
 }
 
+.globe-marker-label {
+  position: absolute;
+  z-index: 2;
+  top: calc(50% + var(--marker-label-y, 24px));
+  left: calc(50% + var(--marker-label-x, 0px));
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ll-panel-solid) 74%, transparent);
+  padding: 1px 3px;
+  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  backdrop-filter: blur(3px);
+}
+
 .globe-marker strong {
-  margin-top: 2px;
   color: var(--ll-text);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 8px;
@@ -597,6 +640,15 @@ a {
     1px 1px 0 var(--ll-panel-solid);
 }
 
+.globe-marker-label small {
+  color: var(--ll-orange);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
 .globe-marker-pin {
   position: relative;
   display: block;
@@ -606,6 +658,17 @@ a {
   border-radius: 50%;
   background: var(--ll-panel-solid);
   box-shadow: 0 0 0 1px color-mix(in srgb, currentColor 25%, transparent);
+  transition: box-shadow 180ms ease;
+}
+
+.globe-traffic-low .globe-marker-pin,
+.globe-traffic-medium .globe-marker-pin,
+.globe-traffic-high .globe-marker-pin,
+.globe-traffic-surge .globe-marker-pin {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, currentColor 30%, transparent),
+    0 0 var(--traffic-glow-size)
+      color-mix(in srgb, var(--ll-orange) 62%, transparent);
 }
 
 .globe-marker-pin::after {
@@ -618,13 +681,41 @@ a {
   inset: 2px;
 }
 
-.globe-marker-active .globe-marker-pin::before {
+.globe-traffic-pulses {
   position: absolute;
-  border: 1px solid currentColor;
+  top: 0;
+  left: 50%;
+  width: 15px;
+  height: 15px;
+  color: var(--ll-orange);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.globe-traffic-pulses i {
+  position: absolute;
+  border: 1.5px solid currentColor;
   border-radius: 50%;
-  content: "";
-  inset: -7px;
-  animation: map-pulse 2.3s ease-out infinite;
+  opacity: 0;
+  inset: 0;
+  animation: traffic-node-pulse var(--traffic-pulse-duration) ease-out infinite;
+}
+
+.globe-traffic-pulses i:nth-child(2) {
+  animation-delay: calc(var(--traffic-pulse-duration) * -0.34);
+}
+
+.globe-traffic-pulses i:nth-child(3) {
+  animation-delay: calc(var(--traffic-pulse-duration) * -0.68);
+}
+
+.globe-traffic-low .globe-traffic-pulses i:nth-child(n + 2),
+.globe-traffic-medium .globe-traffic-pulses i:nth-child(3) {
+  display: none;
+}
+
+.globe-traffic-surge .globe-traffic-pulses i {
+  border-width: 2px;
 }
 
 .globe-marker-complete {
@@ -708,6 +799,29 @@ a {
 
 .legend-idle {
   background: var(--ll-muted);
+}
+
+.traffic-legend {
+  color: var(--ll-text);
+  font-weight: 650;
+}
+
+.legend-traffic-pulse {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ll-orange);
+  box-shadow: 0 0 7px color-mix(in srgb, var(--ll-orange) 60%, transparent);
+}
+
+.legend-traffic-pulse::after {
+  position: absolute;
+  border: 1px solid var(--ll-orange);
+  border-radius: 50%;
+  content: "";
+  inset: -1px;
+  animation: traffic-legend-pulse 1.35s ease-out infinite;
 }
 
 .map-attribution {
@@ -1426,6 +1540,14 @@ a {
   font-size: 9px;
 }
 
+.request-rate-cell {
+  color: var(--ll-orange);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
 .event-card {
   padding: 0;
 }
@@ -2104,14 +2226,28 @@ a {
   }
 }
 
-@keyframes map-pulse {
+@keyframes traffic-node-pulse {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+  12% {
+    opacity: var(--traffic-pulse-opacity);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(var(--traffic-pulse-scale));
+  }
+}
+
+@keyframes traffic-legend-pulse {
   from {
-    opacity: 0.8;
-    transform: scale(0.2);
+    opacity: 0.75;
+    transform: scale(0.7);
   }
   to {
     opacity: 0;
-    transform: scale(1.35);
+    transform: scale(2.6);
   }
 }
 
@@ -2129,6 +2265,12 @@ a {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+
+  .globe-traffic-pulses,
+  .region-traffic-pulses,
+  .legend-traffic-pulse::after {
+    display: none;
   }
 }
 

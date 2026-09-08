@@ -4,6 +4,7 @@ import {
   describeGlobeMarkers,
   type MapAssignment,
 } from "./globe-model";
+import { formatRequestRate, trafficAnimationStyle } from "./globe-traffic";
 
 interface WorldMapProps {
   assignments: MapAssignment[];
@@ -20,7 +21,6 @@ export function WorldMap({ assignments, compact = false }: WorldMapProps) {
   const id = useId().replaceAll(":", "");
   const titleId = `globe-title-${id}`;
   const descriptionId = `globe-description-${id}`;
-  const glowId = `globe-node-glow-${id}`;
   const markers = useMemo(() => createGlobeMarkers(assignments), [assignments]);
   const description = useMemo(() => describeGlobeMarkers(markers), [markers]);
   const [interactiveReady, setInteractiveReady] = useState(false);
@@ -45,17 +45,14 @@ export function WorldMap({ assignments, compact = false }: WorldMapProps) {
         >
           <title id={titleId}>Regional generator placement globe</title>
           <desc id={descriptionId}>{description}</desc>
-          <defs>
-            <radialGradient id={glowId}>
-              <stop offset="0" stopColor="currentColor" stopOpacity=".42" />
-              <stop offset="1" stopColor="currentColor" stopOpacity="0" />
-            </radialGradient>
-          </defs>
           {markers.map((marker) => (
             <g
               key={marker.id}
-              className={`region-node region-${marker.status}`}
+              className={`region-node region-${marker.status} region-traffic-${marker.trafficLevel}`}
               transform={`translate(${marker.fallbackX} ${marker.fallbackY})`}
+              style={trafficAnimationStyle(marker)}
+              data-request-rate={marker.requestRate}
+              data-traffic-level={marker.trafficLevel}
             >
               <title>
                 {marker.label}: {marker.count} generator
@@ -63,20 +60,34 @@ export function WorldMap({ assignments, compact = false }: WorldMapProps) {
                 {marker.locations.length > 0
                   ? `; actual location ${marker.locations.join(", ")}`
                   : ""}
+                {marker.requestRate > 0
+                  ? `; ${marker.requestRate} requests per second`
+                  : ""}
               </title>
-              {marker.status === "active" && (
-                <circle
-                  r="3.7"
-                  className="region-pulse"
-                  fill={`url(#${glowId})`}
-                />
+              {marker.requestRate > 0 && (
+                <g className="region-traffic-pulses" aria-hidden="true">
+                  <circle r="1.45" />
+                  <circle r="1.45" />
+                  <circle r="1.45" />
+                </g>
               )}
               <circle r="1.45" className="region-dot" />
               <circle r=".55" className="region-core" />
               {!compact && (
-                <text y="3.25" textAnchor="middle">
-                  {marker.displayCode}
-                </text>
+                <>
+                  <text y="3.25" textAnchor="middle">
+                    {marker.displayCode}
+                  </text>
+                  {marker.requestRate > 0 && (
+                    <text
+                      y="5.25"
+                      textAnchor="middle"
+                      className="region-request-rate"
+                    >
+                      {formatRequestRate(marker.requestRate)}
+                    </text>
+                  )}
+                </>
               )}
             </g>
           ))}
@@ -102,6 +113,10 @@ export function WorldMap({ assignments, compact = false }: WorldMapProps) {
         </span>
         <span>
           <i className="legend-dot legend-idle" /> Waiting / stopped
+        </span>
+        <span className="traffic-legend">
+          <i className="legend-traffic-pulse" /> Pulse speed + reach = live
+          req/s
         </span>
         <a
           className="map-attribution"

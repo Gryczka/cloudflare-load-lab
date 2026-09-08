@@ -282,6 +282,7 @@ export function RunDetail({
                 <Table.Head>Actual</Table.Head>
                 <Table.Head>Location</Table.Head>
                 <Table.Head>Weight</Table.Head>
+                <Table.Head>Live rate</Table.Head>
                 <Table.Head>State</Table.Head>
               </Table.Row>
             </Table.Header>
@@ -301,6 +302,11 @@ export function RunDetail({
                     </span>
                   </Table.Cell>
                   <Table.Cell>{Math.round(assignment.weight)}%</Table.Cell>
+                  <Table.Cell>
+                    <span className="request-rate-cell">
+                      {(assignment.requestRate ?? 0).toLocaleString()} req/s
+                    </span>
+                  </Table.Cell>
                   <Table.Cell>
                     <Badge
                       variant={

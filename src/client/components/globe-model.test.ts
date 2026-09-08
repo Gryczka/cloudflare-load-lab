@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { DEMO_RUN_CONFIG, REGIONS, type RegionCode } from "../../shared/types";
 import { COLO_COORDINATES } from "../data/colo-coordinates";
-import { createGlobeMarkers, type MapAssignment } from "./globe-model";
+import {
+  createGlobeMarkers,
+  requestTrafficIntensity,
+  requestTrafficLevel,
+  type MapAssignment,
+} from "./globe-model";
 
 function assignment(
   id: string,
   region: RegionCode,
   location?: string,
   status: MapAssignment["status"] = "complete",
+  requestRate = 0,
 ): MapAssignment {
   return {
     id,
@@ -16,6 +22,7 @@ function assignment(
     weight: 100,
     profile: DEMO_RUN_CONFIG.profile,
     status,
+    requestRate,
     placement: location
       ? { requestedRegion: region, location }
       : { requestedRegion: region },
@@ -45,6 +52,25 @@ describe("createGlobeMarkers", () => {
     ]);
 
     expect(marker).toMatchObject({ count: 2, status: "error" });
+  });
+
+  it("aggregates shard request rates and selects a rising traffic band", () => {
+    const [marker] = createGlobeMarkers([
+      assignment("generator-1", "WNAM", "LAX09", "running", 18),
+      assignment("generator-2", "WNAM", "LAX09", "running", 34),
+    ]);
+
+    expect(marker).toMatchObject({
+      requestRate: 52,
+      trafficLevel: "high",
+      trafficIntensity: requestTrafficIntensity(52),
+    });
+    expect(requestTrafficLevel(0)).toBe("none");
+    expect(requestTrafficLevel(9)).toBe("low");
+    expect(requestTrafficLevel(49)).toBe("medium");
+    expect(requestTrafficLevel(199)).toBe("high");
+    expect(requestTrafficLevel(200)).toBe("surge");
+    expect(requestTrafficIntensity(1_023)).toBe(1);
   });
 
   it("distinguishes actively running generators from ready generators", () => {

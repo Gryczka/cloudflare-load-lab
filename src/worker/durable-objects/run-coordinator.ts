@@ -17,6 +17,10 @@ import {
 } from "../../shared/metrics";
 import { planAssignments } from "../../shared/planner";
 import {
+  normalizeBatchRequestRate,
+  visibleRequestRate,
+} from "../../shared/request-rate";
+import {
   REGIONS,
   TERMINAL_STATUSES,
   runConfigSchema,
@@ -30,6 +34,8 @@ import type { Env } from "../env";
 interface InternalAssignment extends AssignmentState {
   latestVus: number;
   latestVusMax: number;
+  metricBatchAt?: string;
+  requestRateAt?: string;
 }
 
 interface StoredRun {
@@ -80,6 +86,7 @@ export class RunCoordinator extends DurableObject<Env> {
         id: `${input.id}-${plan.region.toLowerCase()}-${index}`,
         token: crypto.randomUUID(),
         status: "pending",
+        requestRate: 0,
         lastSequence: 0,
         latestVus: 0,
         latestVusMax: 0,
@@ -194,8 +201,16 @@ export class RunCoordinator extends DurableObject<Env> {
       return false;
     }
 
+    const receivedAt = new Date().toISOString();
     assignment.lastSequence = batch.sequence;
-    assignment.lastHeartbeat = new Date().toISOString();
+    assignment.lastHeartbeat = receivedAt;
+    assignment.requestRate = normalizeBatchRequestRate(
+      batch.requests,
+      batch.timestamp,
+      assignment.metricBatchAt,
+    );
+    assignment.metricBatchAt = batch.timestamp;
+    assignment.requestRateAt = receivedAt;
     assignment.placement = batch.placement;
     if (assignment.status === "ready") assignment.status = "running";
 
@@ -238,6 +253,9 @@ export class RunCoordinator extends DurableObject<Env> {
     assignment.error = completion.error;
     assignment.lastHeartbeat = completion.completedAt;
     assignment.latestVus = 0;
+    assignment.requestRate = 0;
+    assignment.metricBatchAt = undefined;
+    assignment.requestRateAt = undefined;
     run.totals.vus = run.assignments.reduce(
       (sum, item) => sum + item.latestVus,
       0,
@@ -348,6 +366,9 @@ export class RunCoordinator extends DurableObject<Env> {
       }
       assignment.status = "cancelled";
       assignment.latestVus = 0;
+      assignment.requestRate = 0;
+      assignment.metricBatchAt = undefined;
+      assignment.requestRateAt = undefined;
     });
     run.totals.vus = 0;
   }
@@ -374,8 +395,24 @@ export class RunCoordinator extends DurableObject<Env> {
 
   private snapshot(): RunSnapshot {
     const run = this.requireRun();
+    const now = Date.now();
     const assignments = run.assignments.map(
-      ({ token: _token, latestVus: _vus, latestVusMax: _max, ...item }) => item,
+      ({
+        token: _token,
+        latestVus: _vus,
+        latestVusMax: _max,
+        metricBatchAt: _batchAt,
+        requestRateAt,
+        ...item
+      }) => ({
+        ...item,
+        requestRate: visibleRequestRate(
+          item.status,
+          item.requestRate,
+          requestRateAt,
+          now,
+        ),
+      }),
     );
     const timeSeries: TimeSeriesPoint[] = Object.entries(run.buckets)
       .sort(([a], [b]) => a.localeCompare(b))

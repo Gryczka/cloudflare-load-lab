@@ -17,7 +17,7 @@ Load Lab takes one declarative traffic budget, partitions it exactly across regi
 - Multi-step HTTP tasks with checks and think time
 - Exact largest-remainder distribution so shard count never multiplies requested load
 - Container readiness barrier and synchronized start timestamp
-- Live request, failure, VU, dropped-iteration, and mergeable latency metrics
+- Live per-node request-rate pulses plus failure, VU, dropped-iteration, and mergeable latency metrics
 - Global p95/error thresholds with pass/fail status
 - D1 run/target index and R2 JSON reports
 - Atomic global and per-region generator capacity reservations

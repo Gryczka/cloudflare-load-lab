@@ -15,7 +15,7 @@ import { MetricCard } from "../components/MetricCard";
 import { StatusBadge } from "../components/StatusBadge";
 import { WorldMap } from "../components/WorldMap";
 import { api } from "../lib/api";
-import { SAMPLE_RUN } from "../lib/sample";
+import { FABRIC_ASSIGNMENTS } from "../lib/sample";
 
 export function Dashboard() {
   const [runs, setRuns] = useState<RunListItem[]>([]);
@@ -97,7 +97,7 @@ export function Dashboard() {
               <i /> LIVE
             </span>
           </div>
-          <WorldMap assignments={SAMPLE_RUN.assignments} />
+          <WorldMap assignments={FABRIC_ASSIGNMENTS} />
         </LayerCard>
       </section>
 

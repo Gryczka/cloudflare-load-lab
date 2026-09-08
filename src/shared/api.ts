@@ -11,6 +11,8 @@ export interface AssignmentState extends PlannedAssignment {
   token: string;
   status: "pending" | "ready" | "running" | "complete" | "cancelled" | "error";
   placement?: GeneratorPlacement;
+  /** Requests per second derived from the generator's most recent metric delta. */
+  requestRate: number;
   lastSequence: number;
   lastHeartbeat?: string;
   error?: string;

@@ -3,7 +3,9 @@ import { ArrowCounterClockwiseIcon } from "@phosphor-icons/react";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { LAND_POINTS } from "../data/land-points";
+import { layoutMarkerLabels } from "./globe-label-layout";
 import type { GlobeMarker } from "./globe-model";
+import { formatRequestRate, trafficAnimationStyle } from "./globe-traffic";
 
 interface InteractiveGlobeProps {
   markers: GlobeMarker[];
@@ -215,6 +217,14 @@ export function InteractiveGlobe({
       const width = host.clientWidth;
       const height = host.clientHeight;
       let hidden = 0;
+      const visibleLabels: Array<{
+        id: string;
+        element: HTMLDivElement;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+      }> = [];
       for (const marker of markersRef.current) {
         const element = markerElements.current.get(marker.id);
         if (!element) continue;
@@ -231,12 +241,32 @@ export function InteractiveGlobe({
           continue;
         }
         const projected = position.clone().project(camera);
-        element.style.left = `${(projected.x * 0.5 + 0.5) * width}px`;
-        element.style.top = `${(-projected.y * 0.5 + 0.5) * height}px`;
+        const x = (projected.x * 0.5 + 0.5) * width;
+        const y = (-projected.y * 0.5 + 0.5) * height;
+        element.style.left = `${x}px`;
+        element.style.top = `${y}px`;
         element.style.opacity = String(
           Math.min(1, Math.max(0.25, facing * 1.8)),
         );
         element.style.visibility = "visible";
+        const label = element.querySelector<HTMLElement>(".globe-marker-label");
+        if (label) {
+          visibleLabels.push({
+            id: marker.id,
+            element,
+            x,
+            y,
+            width: label.offsetWidth,
+            height: label.offsetHeight,
+          });
+        }
+      }
+      const labelOffsets = layoutMarkerLabels(visibleLabels, { width, height });
+      for (const label of visibleLabels) {
+        const offset = labelOffsets.get(label.id);
+        if (!offset) continue;
+        label.element.style.setProperty("--marker-label-x", `${offset.x}px`);
+        label.element.style.setProperty("--marker-label-y", `${offset.y}px`);
       }
       if (hiddenCountRef.current) {
         hiddenCountRef.current.textContent =
@@ -387,11 +417,28 @@ export function InteractiveGlobe({
               if (element) markerElements.current.set(marker.id, element);
               else markerElements.current.delete(marker.id);
             }}
-            className={`globe-marker globe-marker-${marker.status}`}
-            title={`${marker.label}${marker.locations.length > 0 ? ` · ${marker.locations.join(", ")}` : ""}`}
+            className={`globe-marker globe-marker-${marker.status} globe-traffic-${marker.trafficLevel}`}
+            style={trafficAnimationStyle(marker)}
+            data-request-rate={marker.requestRate}
+            data-traffic-level={marker.trafficLevel}
+            title={`${marker.label}${marker.locations.length > 0 ? ` · ${marker.locations.join(", ")}` : ""}${marker.requestRate > 0 ? ` · ${marker.requestRate} req/s` : ""}`}
           >
+            {marker.requestRate > 0 && (
+              <span className="globe-traffic-pulses">
+                <i />
+                <i />
+                <i />
+              </span>
+            )}
             <span className="globe-marker-pin" />
-            {!compact && <strong>{marker.displayCode}</strong>}
+            {!compact && (
+              <span className="globe-marker-label">
+                <strong>{marker.displayCode}</strong>
+                {marker.requestRate > 0 && (
+                  <small>{formatRequestRate(marker.requestRate)}</small>
+                )}
+              </span>
+            )}
           </div>
         ))}
       </div>
