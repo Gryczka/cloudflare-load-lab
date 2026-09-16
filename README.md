@@ -4,7 +4,7 @@ Global, self-hosted load testing powered by Cloudflare Containers.
 
 **Live app:** [cloudflare-load-lab.dwarven.workers.dev](https://cloudflare-load-lab.dwarven.workers.dev)
 
-![Load Lab dashboard showing a synchronized three-region run](docs/images/dashboard.png)
+![Load Lab completed-run performance report](docs/images/dashboard.png)
 
 Load Lab takes one declarative traffic budget, partitions it exactly across regional generator shards, warms a k6 process in each selected placement pool, and starts every process behind a shared barrier. A Durable Object merges counters and latency histograms while the Kumo dashboard follows the run.
 
@@ -24,8 +24,18 @@ Load Lab takes one declarative traffic budget, partitions it exactly across regi
 - Bounded public demo and owner-only custom runs
 - Target ownership challenge plus per-Container hostname allowlists
 - Kumo React dashboard with a mouse, touch, and keyboard-rotatable placement globe
+- Completed-run performance, reliability, and resource analytics with accessible raw-data tables
 - Configuration wizard, target manager, and architecture view
 - YAML/JSON CLI with JUnit output, idempotency keys, GitHub Actions, and GitLab CI examples
+
+## Completed-run analytics
+
+[Open the deterministic analytics preview](https://cloudflare-load-lab.dwarven.workers.dev/preview) to explore a representative report without launching a load test.
+
+- **Performance:** requested versus delivered load, requests per second, latency envelopes, and saturation curves
+- **Reliability:** failure signatures, error-budget consumption, threshold overlays, and report integrity diagnostics
+- **Resources:** active VUs, dropped work, network throughput, latency distribution, and execution accounting
+- **Accessible detail:** keyboard-operated tabs and expandable tables expose every plotted series without relying on the charts alone
 
 ## Architecture
 
@@ -198,7 +208,7 @@ The Worker rejects local/private-looking origins, disables task redirects, caps 
 
 ## Metrics accuracy
 
-The generator consumes k6's JSON point output into fixed latency buckets. Fixed buckets are mergeable across independent generators; percentile results are reported as the conservative upper bound of the selected bucket. This avoids the invalid practice of averaging regional p95 values. JSON point output is intentionally an MVP tradeoff and should be benchmarked before raising per-shard throughput caps substantially.
+The generator consumes k6's JSON point output into fixed latency buckets. Fixed buckets are mergeable across independent generators; percentile results are reported as the conservative upper bound of the selected bucket. This avoids the invalid practice of averaging regional p95 values. The coordinator allocates delayed counter deltas across their exact callback interval, replaces per-shard gauge contributions, and records missing metric sequences so completed reports can distinguish observed behavior from telemetry gaps. JSON point output is intentionally an MVP tradeoff and should be benchmarked before raising per-shard throughput caps substantially.
 
 ## License and dependencies
 

@@ -20,10 +20,10 @@ totals.failedChecks = 1;
 totals.dataReceived = totals.requests * 2_180;
 totals.dataSent = totals.requests * 460;
 totals.vus = 0;
-totals.vusMax = 24;
+totals.vusMax = 30;
 totals.latency = {
   bounds: [...LATENCY_BOUNDS_MS],
-  counts: [0, 0, 0, 0, 32, totals.requests - 34, 2, 0, 0, 0, 0, 0, 0, 0, 0],
+  counts: [0, 0, 0, 0, 32, totals.requests - 44, 12, 0, 0, 0, 0, 0, 0, 0, 0],
   count: totals.requests,
   sum: totals.requests * 174,
   max: 312,
@@ -47,6 +47,8 @@ export const SAMPLE_RUN: RunSnapshot = {
       status: "complete",
       requestRate: 0,
       lastSequence: 20,
+      acceptedBatches: 20,
+      missingSequences: 0,
       lastHeartbeat: new Date(started.getTime() + 20_000).toISOString(),
       placement: {
         requestedRegion: "ENAM",
@@ -64,6 +66,8 @@ export const SAMPLE_RUN: RunSnapshot = {
       status: "complete",
       requestRate: 0,
       lastSequence: 20,
+      acceptedBatches: 20,
+      missingSequences: 0,
       lastHeartbeat: new Date(started.getTime() + 20_000).toISOString(),
       placement: {
         requestedRegion: "WEUR",
@@ -81,6 +85,8 @@ export const SAMPLE_RUN: RunSnapshot = {
       status: "complete",
       requestRate: 0,
       lastSequence: 20,
+      acceptedBatches: 20,
+      missingSequences: 0,
       lastHeartbeat: new Date(started.getTime() + 20_000).toISOString(),
       placement: {
         requestedRegion: "APAC",
@@ -91,19 +97,38 @@ export const SAMPLE_RUN: RunSnapshot = {
     },
   ],
   totals,
+  peakRequestsPerSecond: Math.max(...requestSeries),
   thresholds: {
     passed: true,
     p95Ms: 300,
     errorRate: 1 / totals.requests,
     checks: { latency: true, errors: true },
   },
-  timeSeries: requestSeries.map((requests, index) => ({
-    timestamp: new Date(started.getTime() + index * 1_000).toISOString(),
-    requests,
-    failedRequests: index === 12 ? 1 : 0,
-    vus: Math.max(3, Math.round(requests * 1.45)),
-    p95Ms: latencySeries[index] ?? 0,
-  })),
+  timeSeries: requestSeries.map((requests, index) => {
+    const p95Ms = latencySeries[index] ?? 0;
+    const failedRequests = index === 12 ? 1 : 0;
+    return {
+      timestamp: new Date(started.getTime() + index * 1_000).toISOString(),
+      requests,
+      failedRequests,
+      checks: requests,
+      failedChecks: failedRequests,
+      iterations: requests,
+      droppedIterations: 0,
+      dataSent: requests * 460,
+      dataReceived: requests * 2_180,
+      vus: Math.max(3, Math.round(requests * 1.45)),
+      vusMax: 30,
+      averageLatencyMs: Math.round(p95Ms * 0.66),
+      latencySamples: requests,
+      maxLatencyMs: Math.round(p95Ms * 1.35),
+      p50Ms: Math.round(p95Ms * 0.55),
+      p75Ms: Math.round(p95Ms * 0.72),
+      p90Ms: Math.round(p95Ms * 0.88),
+      p95Ms,
+      p99Ms: Math.round(p95Ms * 1.16),
+    };
+  }),
   events: [
     {
       at: started.toISOString(),

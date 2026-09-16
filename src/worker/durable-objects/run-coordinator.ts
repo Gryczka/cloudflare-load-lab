@@ -8,10 +8,14 @@ import type {
   TimeSeriesPoint,
 } from "../../shared/api";
 import {
+  allocateMetricInterval,
   addBatch,
   emptyTotals,
   evaluateThresholds,
   histogramPercentile,
+  missingSequenceCount,
+  setGaugeContribution,
+  type GaugeValues,
   type MetricBatch,
   type MetricTotals,
 } from "../../shared/metrics";
@@ -34,8 +38,28 @@ import type { Env } from "../env";
 interface InternalAssignment extends AssignmentState {
   latestVus: number;
   latestVusMax: number;
+  acceptedBatches: number;
+  missingSequences: number;
   metricBatchAt?: string;
   requestRateAt?: string;
+}
+
+interface StoredMetricBucket {
+  totals: MetricTotals;
+  gauges: Record<string, GaugeValues>;
+  rates: StoredMetricRates;
+  latencyContributors: Record<string, true>;
+}
+
+interface StoredMetricRates {
+  requests: number;
+  failedRequests: number;
+  checks: number;
+  failedChecks: number;
+  iterations: number;
+  droppedIterations: number;
+  dataSent: number;
+  dataReceived: number;
 }
 
 interface StoredRun {
@@ -50,7 +74,8 @@ interface StoredRun {
   completedAt?: string;
   assignments: InternalAssignment[];
   totals: MetricTotals;
-  buckets: Record<string, MetricTotals>;
+  peakRequestsPerSecond: number;
+  buckets: Record<string, MetricTotals | StoredMetricBucket>;
   events: RunEvent[];
   error?: string;
   reportReady: boolean;
@@ -88,6 +113,8 @@ export class RunCoordinator extends DurableObject<Env> {
         status: "pending",
         requestRate: 0,
         lastSequence: 0,
+        acceptedBatches: 0,
+        missingSequences: 0,
         latestVus: 0,
         latestVusMax: 0,
       }),
@@ -102,6 +129,7 @@ export class RunCoordinator extends DurableObject<Env> {
       createdAt: new Date().toISOString(),
       assignments,
       totals: emptyTotals(),
+      peakRequestsPerSecond: 0,
       buckets: {},
       events: [],
       reportReady: false,
@@ -178,10 +206,11 @@ export class RunCoordinator extends DurableObject<Env> {
 
   async ingest(token: string, batch: MetricBatch): Promise<boolean> {
     const run = this.requireRun();
-    const assignment = run.assignments.find(
+    const assignmentIndex = run.assignments.findIndex(
       (candidate) =>
         candidate.id === batch.assignmentId && candidate.token === token,
     );
+    const assignment = run.assignments[assignmentIndex];
     if (!assignment || batch.runId !== run.id) {
       console.warn("Rejected metric identity", {
         runIdMatches: batch.runId === run.id,
@@ -192,7 +221,18 @@ export class RunCoordinator extends DurableObject<Env> {
       });
       return false;
     }
-    if (!isValidBatch(batch) || batch.sequence <= assignment.lastSequence) {
+    const receivedAt = new Date().toISOString();
+    const previousBatchAt = assignment.metricBatchAt;
+    if (
+      !isValidBatch(batch) ||
+      !isValidBatchTimestamp(
+        batch.timestamp,
+        previousBatchAt,
+        run,
+        receivedAt,
+      ) ||
+      batch.sequence <= assignment.lastSequence
+    ) {
       console.warn("Rejected malformed or duplicate metric batch", {
         assignmentId: batch.assignmentId,
         sequence: batch.sequence,
@@ -201,13 +241,29 @@ export class RunCoordinator extends DurableObject<Env> {
       return false;
     }
 
-    const receivedAt = new Date().toISOString();
+    const previousGauges = {
+      vus: assignment.latestVus,
+      vusMax: assignment.latestVusMax,
+    };
+    const allocations = allocateMetricInterval(
+      batch.timestamp,
+      previousBatchAt,
+      run.startedAt ?? run.createdAt,
+    );
+    if (allocations.length === 0) return false;
+    const primaryAllocation = allocations.reduce((primary, allocation) =>
+      allocation.fraction > primary.fraction ? allocation : primary,
+    );
+    assignment.acceptedBatches = (assignment.acceptedBatches ?? 0) + 1;
+    assignment.missingSequences =
+      (assignment.missingSequences ?? 0) +
+      missingSequenceCount(assignment.lastSequence, batch.sequence);
     assignment.lastSequence = batch.sequence;
     assignment.lastHeartbeat = receivedAt;
     assignment.requestRate = normalizeBatchRequestRate(
       batch.requests,
       batch.timestamp,
-      assignment.metricBatchAt,
+      previousBatchAt,
     );
     assignment.metricBatchAt = batch.timestamp;
     assignment.requestRateAt = receivedAt;
@@ -221,9 +277,30 @@ export class RunCoordinator extends DurableObject<Env> {
     assignment.latestVusMax = batch.vusMax;
     addBatch(run.totals, { ...batch, vus: 0, vusMax: 0 });
 
-    const bucketKey = secondKey(batch.timestamp);
-    const bucket = (run.buckets[bucketKey] ??= emptyTotals());
-    addBatch(bucket, batch);
+    for (const allocation of allocations) {
+      const coveredBucket = ensureMetricBucket(run, allocation.timestamp);
+      addBatchRates(coveredBucket.rates, batch, allocation.fraction);
+      run.peakRequestsPerSecond = Math.max(
+        run.peakRequestsPerSecond ?? 0,
+        coveredBucket.rates.requests,
+      );
+      setGaugeContribution(
+        coveredBucket.totals,
+        coveredBucket.gauges,
+        String(assignmentIndex),
+        allocation.latest
+          ? { vus: batch.vus, vusMax: batch.vusMax }
+          : previousGauges,
+      );
+    }
+    const currentBucket = ensureMetricBucket(run, primaryAllocation.timestamp);
+    addBatch(currentBucket.totals, { ...batch, vus: 0, vusMax: 0 });
+    if (
+      !previousBatchAt ||
+      Date.parse(batch.timestamp) - Date.parse(previousBatchAt) <= 1_250
+    ) {
+      currentBucket.latencyContributors[String(assignmentIndex)] = true;
+    }
     trimBuckets(run.buckets, 900);
     await this.persist();
     return true;
@@ -396,6 +473,7 @@ export class RunCoordinator extends DurableObject<Env> {
   private snapshot(): RunSnapshot {
     const run = this.requireRun();
     const now = Date.now();
+    const includeDetailedSeries = TERMINAL_STATUSES.includes(run.status);
     const assignments = run.assignments.map(
       ({
         token: _token,
@@ -416,13 +494,50 @@ export class RunCoordinator extends DurableObject<Env> {
     );
     const timeSeries: TimeSeriesPoint[] = Object.entries(run.buckets)
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([timestamp, totals]) => ({
-        timestamp,
-        requests: totals.requests,
-        failedRequests: totals.failedRequests,
-        vus: totals.vus,
-        p95Ms: histogramPercentile(totals.latency, 0.95),
-      }));
+      .map(([timestamp, storedBucket]) => {
+        const totals = metricBucketTotals(storedBucket);
+        const rates = metricBucketRates(storedBucket);
+        const point: TimeSeriesPoint = {
+          timestamp,
+          requests: totals.requests,
+          failedRequests: totals.failedRequests,
+          requestsPerSecond: rates?.requests,
+          failedRequestsPerSecond: rates?.failedRequests,
+          vus: totals.vus,
+          latencySamples: totals.latency.count,
+          latencyAligned: metricBucketLatencyAligned(
+            storedBucket,
+            run.assignments.length,
+          ),
+          p95Ms: histogramPercentile(totals.latency, 0.95),
+        };
+        if (!includeDetailedSeries) return point;
+        return {
+          ...point,
+          checks: totals.checks,
+          checksPerSecond: rates?.checks,
+          failedChecks: totals.failedChecks,
+          failedChecksPerSecond: rates?.failedChecks,
+          iterations: totals.iterations,
+          iterationsPerSecond: rates?.iterations,
+          droppedIterations: totals.droppedIterations,
+          droppedIterationsPerSecond: rates?.droppedIterations,
+          dataSent: totals.dataSent,
+          dataSentPerSecond: rates?.dataSent,
+          dataReceived: totals.dataReceived,
+          dataReceivedPerSecond: rates?.dataReceived,
+          vusMax: totals.vusMax,
+          averageLatencyMs:
+            totals.latency.count === 0
+              ? 0
+              : totals.latency.sum / totals.latency.count,
+          maxLatencyMs: totals.latency.max,
+          p50Ms: histogramPercentile(totals.latency, 0.5),
+          p75Ms: histogramPercentile(totals.latency, 0.75),
+          p90Ms: histogramPercentile(totals.latency, 0.9),
+          p99Ms: histogramPercentile(totals.latency, 0.99),
+        };
+      });
     return {
       id: run.id,
       status: run.status,
@@ -433,6 +548,7 @@ export class RunCoordinator extends DurableObject<Env> {
       completedAt: run.completedAt,
       assignments,
       totals: run.totals,
+      peakRequestsPerSecond: run.peakRequestsPerSecond,
       thresholds: evaluateThresholds(run.totals, run.config.thresholds),
       timeSeries,
       events: run.events,
@@ -499,19 +615,116 @@ function isValidBatch(batch: MetricBatch): boolean {
   );
 }
 
-function secondKey(timestamp: string): string {
-  const parsed = new Date(timestamp);
-  const time = Number.isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
-  return new Date(Math.floor(time / 1_000) * 1_000).toISOString();
+function isValidBatchTimestamp(
+  timestamp: string,
+  previous: string | undefined,
+  run: StoredRun,
+  receivedAt: string,
+): boolean {
+  const time = Date.parse(timestamp);
+  const received = Date.parse(receivedAt);
+  const started = Date.parse(run.startedAt ?? run.createdAt);
+  const previousTime = Date.parse(previous ?? "");
+  const deadline = started + (runDurationSeconds(run.config) + 35) * 1_000;
+  return (
+    Number.isFinite(time) &&
+    time >= started - 1_000 &&
+    time <= deadline &&
+    time <= received + 5_000 &&
+    (!Number.isFinite(previousTime) || time > previousTime)
+  );
 }
 
 function trimBuckets(
-  buckets: Record<string, MetricTotals>,
+  buckets: Record<string, MetricTotals | StoredMetricBucket>,
   maximum: number,
 ): void {
   const keys = Object.keys(buckets).sort();
   for (const key of keys.slice(0, Math.max(0, keys.length - maximum)))
     delete buckets[key];
+}
+
+function ensureMetricBucket(
+  run: StoredRun,
+  bucketKey: string,
+): StoredMetricBucket {
+  const existing = run.buckets[bucketKey];
+  if (existing && "totals" in existing) {
+    existing.rates ??= emptyMetricRates();
+    existing.latencyContributors ??= {};
+    return existing;
+  }
+
+  const totals = existing ?? emptyTotals();
+  const bucket: StoredMetricBucket = {
+    totals,
+    gauges: {},
+    rates: emptyMetricRates(),
+    latencyContributors: {},
+  };
+  if (existing) {
+    totals.vus = 0;
+    totals.vusMax = 0;
+    run.assignments.forEach((assignment, index) => {
+      setGaugeContribution(totals, bucket.gauges, String(index), {
+        vus: assignment.latestVus,
+        vusMax: assignment.latestVusMax,
+      });
+    });
+  }
+  run.buckets[bucketKey] = bucket;
+  return bucket;
+}
+
+function metricBucketTotals(
+  bucket: MetricTotals | StoredMetricBucket,
+): MetricTotals {
+  return "totals" in bucket ? bucket.totals : bucket;
+}
+
+function metricBucketRates(
+  bucket: MetricTotals | StoredMetricBucket,
+): StoredMetricRates | undefined {
+  return "totals" in bucket ? bucket.rates : undefined;
+}
+
+function metricBucketLatencyAligned(
+  bucket: MetricTotals | StoredMetricBucket,
+  assignmentCount: number,
+): boolean | undefined {
+  if (!("totals" in bucket)) return undefined;
+  return (
+    assignmentCount > 0 &&
+    Object.keys(bucket.latencyContributors).length === assignmentCount
+  );
+}
+
+function emptyMetricRates(): StoredMetricRates {
+  return {
+    requests: 0,
+    failedRequests: 0,
+    checks: 0,
+    failedChecks: 0,
+    iterations: 0,
+    droppedIterations: 0,
+    dataSent: 0,
+    dataReceived: 0,
+  };
+}
+
+function addBatchRates(
+  target: StoredMetricRates,
+  batch: MetricBatch,
+  fraction: number,
+): void {
+  target.requests += batch.requests * fraction;
+  target.failedRequests += batch.failedRequests * fraction;
+  target.checks += batch.checks * fraction;
+  target.failedChecks += batch.failedChecks * fraction;
+  target.iterations += batch.iterations * fraction;
+  target.droppedIterations += batch.droppedIterations * fraction;
+  target.dataSent += batch.dataSent * fraction;
+  target.dataReceived += batch.dataReceived * fraction;
 }
 
 async function inBatches<T>(

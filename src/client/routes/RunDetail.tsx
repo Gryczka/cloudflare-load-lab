@@ -230,7 +230,7 @@ export function RunDetail({
       >
         <MetricCard
           label="Delivered rate"
-          value={`${latest?.requests ?? 0} req/s`}
+          value={`${Math.round(latest?.requestsPerSecond ?? latest?.requests ?? 0)} req/s`}
           detail={`${run.totals.iterations.toLocaleString()} iterations`}
           icon={GaugeIcon}
           tone="orange"
@@ -261,10 +261,7 @@ export function RunDetail({
       <Suspense
         fallback={<div className="chart-loading">Loading metric charts…</div>}
       >
-        <RunCharts
-          points={run.timeSeries}
-          p95Threshold={run.config.thresholds.p95Ms}
-        />
+        <RunCharts run={run} detailed={!active} />
       </Suspense>
 
       <section className="run-lower-grid">

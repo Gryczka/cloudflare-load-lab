@@ -14,6 +14,8 @@ export interface AssignmentState extends PlannedAssignment {
   /** Requests per second derived from the generator's most recent metric delta. */
   requestRate: number;
   lastSequence: number;
+  acceptedBatches?: number;
+  missingSequences?: number;
   lastHeartbeat?: string;
   error?: string;
 }
@@ -28,8 +30,31 @@ export interface TimeSeriesPoint {
   timestamp: string;
   requests: number;
   failedRequests: number;
+  requestsPerSecond?: number;
+  failedRequestsPerSecond?: number;
+  checks?: number;
+  checksPerSecond?: number;
+  failedChecks?: number;
+  failedChecksPerSecond?: number;
+  iterations?: number;
+  iterationsPerSecond?: number;
+  droppedIterations?: number;
+  droppedIterationsPerSecond?: number;
+  dataSent?: number;
+  dataSentPerSecond?: number;
+  dataReceived?: number;
+  dataReceivedPerSecond?: number;
   vus: number;
+  vusMax?: number;
+  averageLatencyMs?: number;
+  latencySamples?: number;
+  latencyAligned?: boolean;
+  maxLatencyMs?: number;
+  p50Ms?: number;
+  p75Ms?: number;
+  p90Ms?: number;
   p95Ms: number;
+  p99Ms?: number;
 }
 
 export interface RunSnapshot {
@@ -42,6 +67,7 @@ export interface RunSnapshot {
   completedAt?: string;
   assignments: Omit<AssignmentState, "token">[];
   totals: MetricTotals;
+  peakRequestsPerSecond?: number;
   thresholds: ThresholdResult;
   timeSeries: TimeSeriesPoint[];
   events: RunEvent[];
