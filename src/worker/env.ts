@@ -22,6 +22,8 @@ export interface Env {
   GENERATOR_APAC: DurableObjectNamespace<GeneratorAPAC>;
   GENERATOR_SAM: DurableObjectNamespace<GeneratorSAM>;
   RUN_RATE_LIMITER: RateLimit;
+  PUBLIC_READ_LIMITER: RateLimit;
+  CALLBACK_RATE_LIMITER: RateLimit;
   PUBLIC_DEMO_MODE: string;
   DEMO_MAX_ACTIVE_RUNS: string;
   DEMO_MAX_DAILY_RUNS: string;

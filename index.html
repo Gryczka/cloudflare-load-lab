@@ -9,9 +9,20 @@
       content="Run synchronized global load tests from Cloudflare Containers."
     />
     <title>Load Lab · Cloudflare Containers</title>
+    <link rel="canonical" href="https://cloudflare-load-lab.dwarven.workers.dev/" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main>
+        <h1>Load Lab: synchronized global load testing</h1>
+        <p>Explore how Cloudflare Containers generate a fixed traffic budget across regions, while a Worker and Durable Objects coordinate admission, readiness, metrics, and confirmed teardown.</p>
+        <h2>Architecture and sample results</h2>
+        <p>Regional generators report mergeable latency histograms. D1 indexes runs, R2 stores reports, and shared reservations bound execution. This is Cloudflare-network testing, not residential last-mile monitoring.</p>
+        <nav><a href="/architecture">Read the architecture</a> · <a href="/preview">Explore sample results</a></nav>
+        <p>Browsing does not start generators. The interactive application requires an explicit run action; custom targets require administrator authority and verification.</p>
+        <a href="https://developers.cloudflare.com/containers/?utm_source=gryczka.dev&amp;utm_medium=referral&amp;utm_campaign=app-garden&amp;utm_content=load-lab-containers&amp;utm_term=containers">Cloudflare Containers documentation</a>
+      </main>
+    </div>
     <script type="module" src="/src/client/main.tsx"></script>
   </body>
 </html>

@@ -1,0 +1,8 @@
+User-agent: *
+Content-Signal: search=yes,ai-input=yes,ai-train=no
+Allow: /
+Disallow: /api/
+Disallow: /runs/
+Disallow: /targets
+Disallow: /new
+Sitemap: https://cloudflare-load-lab.dwarven.workers.dev/sitemap.xml

@@ -62,6 +62,29 @@ Placement is regional, not exact-city synthetic monitoring. The UI always separa
 
 See [docs/architecture.md](docs/architecture.md) and [docs/threat-model.md](docs/threat-model.md).
 
+### Public demo guardrails
+
+Anonymous run lists, snapshots, and reports are cached for 15/5/60 seconds, with normalized query-free keys. Administrator responses use `no-store`; invalid authorization cannot consume a public cache entry. Unknown run IDs are rejected through D1 before per-run dispatch. Reports are limited to 2 MiB.
+
+Callbacks require indexed, expiring D1 hashes of server-generated assignment tokens before per-run dispatch. Initialization state is durable before external D1 writes. A failed prelaunch authority write releases its reservation; ambiguous runtime execution retains capacity. Interrupted startup revokes its generation, schedules recovery, destroys assigned runtimes, and denies stale generator continuations using persistent tombstones. Capacity is released only after runtime-confirmed destruction, with 30-second retries on uncertainty. D1/report outages cannot prevent release after confirmed teardown.
+
+`PUBLIC_READ_LIMITER` (`9102`, 60/minute) and `CALLBACK_RATE_LIMITER` (`9103`, 1000/minute) fail closed and meter per-IP/shared per-location keys. Native limits are approximate; shared execution accounting remains in the budget DO. JSON requests use streamed size limits and a ten-second total deadline; cancellation cannot extend that deadline.
+
+`assets.run_worker_first=true` wraps static/SPA responses in security headers. Home, architecture, and sample preview provide pre-hydration HTML, descriptions, and canonical URLs. Robots/sitemap exclude execution/private routes and publish `Content-Signal: search=yes,ai-input=yes,ai-train=no`. Resource anchors carry app-garden UTM parameters.
+
+Credential-isolated local checks:
+
+```bash
+NODE_OPTIONS=--require=./scripts/offline-check.cjs npm run cf-typegen
+GOPROXY=off GOSUMDB=off NODE_OPTIONS=--require=./scripts/offline-check.cjs npm run check
+NODE_OPTIONS=--require=./scripts/offline-check.cjs npx --no-install wrangler deploy --dry-run --containers-rollout=none
+DOCKER_BUILDKIT=0 docker build --pull=false --network=none --platform linux/amd64 -t loadlab-generator-release-hardening-check ./generator
+```
+
+The image check requires cached `golang:1.25.5-alpine` and `grafana/k6:2.2.0` base images.
+
+Upgrading an existing deployment: drain legacy runs (their callback tokens are absent from the new registry), apply migration `0003_callback_authority.sql`, then deploy with `npm run deploy`.
+
 ## Prerequisites
 
 - Node.js 22 or newer

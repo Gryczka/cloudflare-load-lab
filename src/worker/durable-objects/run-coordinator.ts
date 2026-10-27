@@ -34,8 +34,11 @@ import {
   type RunStatus,
 } from "../../shared/types";
 import type { Env } from "../env";
+import { bounded } from "../http";
+import { callbackHash } from "../callback-authority";
 
 interface InternalAssignment extends AssignmentState {
+  teardownConfirmed?: boolean;
   latestVus: number;
   latestVusMax: number;
   acceptedBatches: number;
@@ -63,6 +66,13 @@ interface StoredMetricRates {
 }
 
 interface StoredRun {
+  cleanupPending?: boolean;
+  startupPending?: boolean;
+  startupGeneration?: string;
+  initializationPending?: boolean;
+  executionDispatched?: boolean;
+  finalStatus?: RunStatus;
+  finalError?: string;
   id: string;
   status: RunStatus;
   config: RunConfig;
@@ -88,6 +98,16 @@ export class RunCoordinator extends DurableObject<Env> {
     super(ctx, env);
     ctx.blockConcurrencyWhile(async () => {
       this.run = await ctx.storage.get<StoredRun>("run");
+      if (this.run?.startupPending || this.run?.initializationPending) {
+        this.run.startupPending = false;
+        this.run.initializationPending = false;
+        this.run.startupGeneration = undefined;
+        this.run.cleanupPending = true;
+        this.run.finalStatus = "error";
+        this.run.finalError = "Interrupted initialization or startup";
+        await this.persist();
+        await ctx.storage.setAlarm(Date.now() + 100);
+      }
     });
   }
 
@@ -120,6 +140,8 @@ export class RunCoordinator extends DurableObject<Env> {
       }),
     );
     this.run = {
+      initializationPending: true,
+      executionDispatched: false,
       id: input.id,
       status: "queued",
       config,
@@ -139,6 +161,34 @@ export class RunCoordinator extends DurableObject<Env> {
       `Reserved ${assignments.length} generator shard${assignments.length === 1 ? "" : "s"}`,
     );
     await this.persist();
+    await this.ctx.storage.setAlarm(Date.now() + 30_000);
+    try {
+      const expiresAt = Date.now() + (runDurationSeconds(config) + 600) * 1_000;
+      await this.env.LOADLAB_DB.batch(
+        await Promise.all(
+          assignments.map(async (assignment) =>
+            this.env.LOADLAB_DB.prepare(
+              "INSERT OR REPLACE INTO run_callback_authority(run_id, assignment_id, token_hash, expires_at) VALUES (?, ?, ?, ?)",
+            ).bind(
+              input.id,
+              assignment.id,
+              await callbackHash(assignment.token),
+              expiresAt,
+            ),
+          ),
+        ),
+      );
+      const stored = await this.ctx.storage.get<StoredRun>("run");
+      if (stored?.cleanupPending || !stored?.initializationPending)
+        throw new Error("Initialization cancelled");
+      this.run.initializationPending = false;
+      await this.persist();
+    } catch (error) {
+      this.run = (await this.ctx.storage.get<StoredRun>("run")) ?? this.run;
+      this.run.initializationPending = false;
+      await this.finalize("error", "Callback authority initialization failed");
+      throw error;
+    }
     // Use an alarm so orchestration is not bounded by the API request's waitUntil
     // lifetime. The execution deadline replaces this alarm after startup.
     await this.ctx.storage.setAlarm(Date.now() + 100);
@@ -147,13 +197,22 @@ export class RunCoordinator extends DurableObject<Env> {
 
   async launch(): Promise<void> {
     const run = this.requireRun();
-    if (run.status !== "queued") return;
+    if (
+      run.status !== "queued" ||
+      run.initializationPending ||
+      run.cleanupPending
+    )
+      return;
     run.status = "starting";
+    run.startupPending = true;
+    run.executionDispatched = true;
+    const generation = (run.startupGeneration = crypto.randomUUID());
     this.event("starting", "Warming regional Containers");
-    await this.updateIndex();
     await this.persist();
+    await this.ctx.storage.setAlarm(Date.now() + 60_000);
 
     try {
+      await this.updateIndex();
       await inBatches(run.assignments, 6, async (assignment) => {
         const stub = this.generator(assignment.region, assignment.id);
         const request: AgentPrepareRequest = {
@@ -166,7 +225,11 @@ export class RunCoordinator extends DurableObject<Env> {
           profile: assignment.profile,
           requestedRegion: assignment.region,
         };
-        const response = await stub.prepare(request);
+        await this.assertStartup(generation);
+        const response = await stub.prepare(request, generation);
+        await this.assertStartup(generation);
+        if (run.cleanupPending)
+          throw new Error("Run cancellation requested during startup");
         assignment.status = "ready";
         assignment.placement = response.placement;
         assignment.lastHeartbeat = new Date().toISOString();
@@ -179,10 +242,18 @@ export class RunCoordinator extends DurableObject<Env> {
 
       const startAt = new Date(Date.now() + 3_000).toISOString();
       await inBatches(run.assignments, 6, async (assignment) => {
-        await this.generator(assignment.region, assignment.id).launch(startAt);
+        await this.assertStartup(generation);
+        await this.generator(assignment.region, assignment.id).launch(
+          startAt,
+          generation,
+        );
+        await this.assertStartup(generation);
         assignment.status = "running";
       });
+      if (run.cleanupPending)
+        throw new Error("Run cancellation requested during launch");
       run.status = "running";
+      run.startupPending = false;
       run.startedAt = startAt;
       this.event(
         "running",
@@ -193,19 +264,24 @@ export class RunCoordinator extends DurableObject<Env> {
           (runDurationSeconds(run.config) + 30) * 1_000,
       );
       await this.updateIndex();
+      await this.assertStartup(generation);
       await this.persist();
     } catch (error) {
+      const stored = await this.ctx.storage.get<StoredRun>("run");
+      if (stored?.startupGeneration !== generation) return;
+      run.startupPending = false;
       const message = error instanceof Error ? error.message : String(error);
-      await this.stopGenerators();
       await this.finalize(
-        "error",
-        `Unable to launch every requested region: ${message}`,
+        run.finalStatus ?? "error",
+        run.finalError ?? `Unable to launch every requested region: ${message}`,
       );
     }
   }
 
   async ingest(token: string, batch: MetricBatch): Promise<boolean> {
     const run = this.requireRun();
+    if (run.cleanupPending || TERMINAL_STATUSES.includes(run.status))
+      return false;
     const assignmentIndex = run.assignments.findIndex(
       (candidate) =>
         candidate.id === batch.assignmentId && candidate.token === token,
@@ -311,6 +387,8 @@ export class RunCoordinator extends DurableObject<Env> {
     completion: AgentCompletePayload,
   ): Promise<boolean> {
     const run = this.requireRun();
+    if (run.cleanupPending || TERMINAL_STATUSES.includes(run.status))
+      return false;
     const assignment = run.assignments.find(
       (candidate) =>
         candidate.id === completion.assignmentId && candidate.token === token,
@@ -371,9 +449,6 @@ export class RunCoordinator extends DurableObject<Env> {
     if (TERMINAL_STATUSES.includes(run.status)) return this.snapshot();
     run.status = "stopping";
     this.event("stopping", "Cancellation requested; draining generators");
-    await this.updateIndex();
-    await this.persist();
-    await this.stopGenerators();
     await this.finalize("cancelled");
     return this.snapshot();
   }
@@ -384,18 +459,56 @@ export class RunCoordinator extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     const run = this.run;
+    if (run?.cleanupPending || run?.initializationPending) {
+      await this.finalize(run.finalStatus ?? "error", run.finalError);
+      return;
+    }
     if (!run || TERMINAL_STATUSES.includes(run.status)) return;
     if (run.status === "queued") {
       await this.launch();
       return;
     }
-    await this.stopGenerators();
     await this.finalize("error", "Run exceeded its execution deadline");
+  }
+
+  /** Called only by the trusted budget coordinator, never by a public run ID. */
+  async reconcileTeardown(): Promise<boolean> {
+    if (!this.run) return false;
+    await this.finalize(
+      this.run.finalStatus ?? "error",
+      this.run.finalError ?? "Reservation deadline exceeded",
+    );
+    if (
+      !this.run.cleanupPending &&
+      this.run.assignments.every((item) => item.teardownConfirmed)
+    )
+      await this.env.BUDGET_COORDINATOR.getByName("global").release(
+        this.run.id,
+      );
+    return !this.run.cleanupPending;
   }
 
   private async finalize(status: RunStatus, error?: string): Promise<void> {
     const run = this.requireRun();
     if (TERMINAL_STATUSES.includes(run.status) && run.completedAt) return;
+    run.cleanupPending = true;
+    run.finalStatus = status;
+    run.finalError = error;
+    run.startupGeneration = undefined;
+    run.startupPending = false;
+    await this.persist();
+    if (!(await this.stopGenerators())) {
+      run.status = "stopping";
+      await this.persist();
+      await this.ctx.storage.setAlarm(Date.now() + 30_000);
+      try {
+        await this.updateIndex();
+      } catch {
+        /* Durable teardown retries survive D1 outages. */
+      }
+      return;
+    }
+    run.cleanupPending = false;
     run.status = status;
     run.completedAt = new Date().toISOString();
     run.error = error;
@@ -405,6 +518,8 @@ export class RunCoordinator extends DurableObject<Env> {
     await this.persist();
 
     const snapshot = this.snapshot();
+    // Runtime confirmation is already durable. D1/report outages cannot hold capacity.
+    await this.env.BUDGET_COORDINATOR.getByName("global").release(run.id);
     try {
       await this.env.LOADLAB_ARTIFACTS.put(
         `runs/${run.id}/summary.json`,
@@ -424,30 +539,47 @@ export class RunCoordinator extends DurableObject<Env> {
     }
     await this.updateIndex();
     await this.persist();
-    await this.env.BUDGET_COORDINATOR.getByName("global").release(run.id);
+    await this.env.LOADLAB_DB.prepare(
+      "DELETE FROM run_callback_authority WHERE run_id = ?",
+    )
+      .bind(run.id)
+      .run();
   }
 
-  private async stopGenerators(): Promise<void> {
+  private async assertStartup(generation: string): Promise<void> {
+    const stored = await this.ctx.storage.get<StoredRun>("run");
+    if (stored?.startupGeneration !== generation || stored.cleanupPending)
+      throw new Error("Startup generation was revoked");
+  }
+
+  private async stopGenerators(): Promise<boolean> {
     const run = this.requireRun();
+    let confirmed = true;
+    if (run.executionDispatched === false) {
+      for (const assignment of run.assignments)
+        assignment.teardownConfirmed = true;
+      return true;
+    }
     await inBatches(run.assignments, 6, async (assignment) => {
-      if (
-        ["pending", "complete", "cancelled", "error"].includes(
-          assignment.status,
-        )
-      )
-        return;
+      if (assignment.teardownConfirmed) return;
       try {
-        await this.generator(assignment.region, assignment.id).stopRun();
-      } catch (error) {
-        console.error(`Unable to stop ${assignment.id}`, error);
+        await bounded(
+          this.generator(assignment.region, assignment.id).stopRun(),
+        );
+        assignment.teardownConfirmed = true;
+      } catch {
+        confirmed = false;
+        return;
       }
-      assignment.status = "cancelled";
+      if (!["complete", "cancelled", "error"].includes(assignment.status))
+        assignment.status = "cancelled";
       assignment.latestVus = 0;
       assignment.requestRate = 0;
       assignment.metricBatchAt = undefined;
       assignment.requestRateAt = undefined;
     });
     run.totals.vus = 0;
+    return confirmed;
   }
 
   private generator(region: RegionCode, name: string) {
@@ -733,7 +865,11 @@ async function inBatches<T>(
   operation: (value: T) => Promise<void>,
 ): Promise<void> {
   for (let index = 0; index < values.length; index += size) {
-    await Promise.all(values.slice(index, index + size).map(operation));
+    const results = await Promise.allSettled(
+      values.slice(index, index + size).map(operation),
+    );
+    const failed = results.find((result) => result.status === "rejected");
+    if (failed?.status === "rejected") throw failed.reason;
   }
 }
 

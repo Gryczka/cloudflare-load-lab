@@ -34,6 +34,9 @@ import {
   withSecurityHeaders,
 } from "./http";
 import { resolveBuiltInTarget } from "./target-policy";
+import { authorizeCallback } from "./callback-authority";
+import { publicRead } from "./public-reads";
+import { discoverableAsset } from "./discovery";
 
 export {
   BudgetCoordinator,
@@ -78,9 +81,13 @@ export default {
     try {
       const url = new URL(request.url);
       if (url.pathname.startsWith("/api/")) {
-        return withSecurityHeaders(await api(request, url, env));
+        const response = withSecurityHeaders(await api(request, url, env));
+        response.headers.set("X-Robots-Tag", "noindex, nofollow");
+        return response;
       }
-      return withSecurityHeaders(await env.ASSETS.fetch(request));
+      return withSecurityHeaders(
+        discoverableAsset(await env.ASSETS.fetch(request), url.pathname),
+      );
     } catch (error) {
       return withSecurityHeaders(errorResponse(error));
     }
@@ -110,37 +117,45 @@ async function api(request: Request, url: URL, env: Env): Promise<Response> {
   }
 
   if (url.pathname === "/api/runs" && request.method === "GET") {
-    return listRuns(request, env);
+    return publicRead(request, env, 15, () => listRuns(request, env));
   }
   if (url.pathname === "/api/runs" && request.method === "POST") {
     return createRun(request, url, env);
   }
 
   const runMatch = url.pathname.match(
-    /^\/api\/runs\/([0-9a-f-]+)(?:\/(stop|report))?$/,
+    /^\/api\/runs\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/(stop|report))?$/,
   );
   if (runMatch) {
     const runId = runMatch[1];
     if (!runId) throw new HttpError(404, "Run not found");
-    await authorizeRunRead(request, env, runId);
     if (request.method === "GET" && !runMatch[2]) {
-      return json(await env.RUN_COORDINATOR.getByName(runId).getSnapshot());
+      return publicRead(request, env, 5, async () => {
+        await authorizeRunRead(request, env, runId);
+        return json(await env.RUN_COORDINATOR.getByName(runId).getSnapshot());
+      });
     }
     if (request.method === "POST" && runMatch[2] === "stop") {
       requireAdmin(request, env);
+      await authorizeRunRead(request, env, runId);
       return json(await env.RUN_COORDINATOR.getByName(runId).stopRun());
     }
     if (request.method === "GET" && runMatch[2] === "report") {
-      const object = await env.LOADLAB_ARTIFACTS.get(
-        `runs/${runId}/summary.json`,
-      );
-      if (!object) throw new HttpError(404, "Report is not ready");
-      return new Response(object.body, {
-        headers: {
-          "Content-Type": "application/json; charset=utf-8",
-          "Content-Disposition": `attachment; filename="load-lab-${runId}.json"`,
-          "Cache-Control": "private, max-age=60",
-        },
+      return publicRead(request, env, 60, async () => {
+        await authorizeRunRead(request, env, runId);
+        const object = await env.LOADLAB_ARTIFACTS.get(
+          `runs/${runId}/summary.json`,
+        );
+        if (!object) throw new HttpError(404, "Report is not ready");
+        if (object.size > 2 * 1024 * 1024)
+          throw new HttpError(413, "Report exceeds public read limits");
+        return new Response(object.body, {
+          headers: {
+            "Content-Type": "application/json; charset=utf-8",
+            "Content-Disposition": `attachment; filename="load-lab-${runId}.json"`,
+            "Cache-Control": "private, max-age=60",
+          },
+        });
       });
     }
   }
@@ -284,6 +299,7 @@ async function createRun(
     );
 
   const createdAt = new Date().toISOString();
+  let initializationDispatched = false;
   try {
     const statements = [
       env.LOADLAB_DB.prepare(
@@ -308,6 +324,7 @@ async function createRun(
     await env.LOADLAB_DB.batch(statements);
 
     const coordinator = env.RUN_COORDINATOR.getByName(id);
+    initializationDispatched = true;
     const snapshot = await coordinator.initialize({
       id,
       config,
@@ -317,7 +334,14 @@ async function createRun(
     });
     return json(snapshot, { status: 202 });
   } catch (error) {
-    await budget.release(id);
+    if (!initializationDispatched) await budget.release(id);
+    else {
+      try {
+        await env.RUN_COORDINATOR.getByName(id).reconcileTeardown();
+      } catch {
+        /* Initialization may have succeeded; retain its lease. */
+      }
+    }
     if (keyHash && requestHash) {
       const existing = await env.LOADLAB_DB.prepare(
         "SELECT run_id, request_hash FROM idempotency_keys WHERE key_hash = ?",
@@ -371,8 +395,8 @@ async function authorizeRunRead(
   env: Env,
   runId: string,
 ): Promise<void> {
-  if (isAdmin(request, env)) return;
-  if (!(await runIsDemo(env, runId)))
+  const demo = await runIsDemo(env, runId);
+  if (!demo && !isAdmin(request, env))
     throw new HttpError(401, "Administrator token required");
 }
 
@@ -390,6 +414,13 @@ async function ingestMetrics(request: Request, env: Env): Promise<Response> {
   const payload = await readJson<InternalMetricPayload>(request, 128_000);
   if (!payload?.batch?.runId || !payload.token)
     throw new HttpError(400, "Invalid metric batch");
+  await authorizeCallback(
+    request,
+    env,
+    payload.batch.runId,
+    payload.batch.assignmentId,
+    payload.token,
+  );
   const accepted = await env.RUN_COORDINATOR.getByName(
     payload.batch.runId,
   ).ingest(payload.token, payload.batch);
@@ -404,6 +435,13 @@ async function completeAssignment(
   const payload = await readJson<InternalCompletePayload>(request, 32_000);
   if (!payload?.runId || !payload.token)
     throw new HttpError(400, "Invalid completion payload");
+  await authorizeCallback(
+    request,
+    env,
+    payload.runId,
+    payload.assignmentId,
+    payload.token,
+  );
   const accepted = await env.RUN_COORDINATOR.getByName(payload.runId).complete(
     payload.token,
     payload,

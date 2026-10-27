@@ -5,6 +5,7 @@ import {
   type MapAssignment,
 } from "./globe-model";
 import { formatRequestRate, trafficAnimationStyle } from "./globe-traffic";
+import { gardenUrl } from "../../shared/garden";
 
 interface WorldMapProps {
   assignments: MapAssignment[];
@@ -120,7 +121,7 @@ export function WorldMap({ assignments, compact = false }: WorldMapProps) {
         </span>
         <a
           className="map-attribution"
-          href="https://www.cloudflare.com/network/"
+          href={gardenUrl("https://www.cloudflare.com/network/")}
           target="_blank"
           rel="noreferrer"
         >

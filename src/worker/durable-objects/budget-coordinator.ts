@@ -151,6 +151,15 @@ export class BudgetCoordinator extends DurableObject<Env> {
 
   async alarm(): Promise<void> {
     await this.cleanup();
+    for (const [id, lease] of Object.entries(this.state.leases)) {
+      if (lease.expiresAt > Date.now()) continue;
+      try {
+        await this.env.RUN_COORDINATOR.getByName(id).reconcileTeardown();
+      } catch {
+        /* Unknown teardown retains capacity. */
+      }
+    }
+    await this.persist();
   }
 
   private async cleanup(): Promise<void> {
@@ -161,12 +170,7 @@ export class BudgetCoordinator extends DurableObject<Env> {
       this.state.demoRunsToday = 0;
       changed = true;
     }
-    for (const [runId, lease] of Object.entries(this.state.leases)) {
-      if (lease.expiresAt <= Date.now()) {
-        delete this.state.leases[runId];
-        changed = true;
-      }
-    }
+    // Expiry is a reconciliation trigger, never evidence that a Container stopped.
     if (changed) await this.persist();
   }
 
@@ -176,7 +180,9 @@ export class BudgetCoordinator extends DurableObject<Env> {
       (lease) => lease.expiresAt,
     );
     if (expiries.length > 0)
-      await this.ctx.storage.setAlarm(Math.min(...expiries));
+      await this.ctx.storage.setAlarm(
+        Math.max(Date.now() + 30_000, Math.min(...expiries)),
+      );
   }
 }
 

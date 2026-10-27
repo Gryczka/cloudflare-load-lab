@@ -1,3 +1,5 @@
+import type { Env } from "./env";
+
 export class HttpError extends Error {
   constructor(
     public status: number,
@@ -21,14 +23,59 @@ export async function readJson<T>(
 ): Promise<T> {
   const length = Number(request.headers.get("content-length") ?? 0);
   if (length > maxBytes) throw new HttpError(413, "Request body is too large");
-  const body = await request.text();
-  if (new TextEncoder().encode(body).byteLength > maxBytes) {
-    throw new HttpError(413, "Request body is too large");
+  const reader = request.body?.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const deadline = Date.now() + 10_000;
+  try {
+    while (reader) {
+      const part = await bounded(
+        reader.read(),
+        Math.max(1, deadline - Date.now()),
+      );
+      if (part.done) break;
+      total += part.value.byteLength;
+      if (total > maxBytes)
+        throw new HttpError(413, "Request body is too large");
+      chunks.push(part.value);
+    }
+  } catch (error) {
+    void reader?.cancel().catch(() => undefined);
+    throw error;
+  } finally {
+    reader?.releaseLock();
   }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  const body = new TextDecoder().decode(bytes);
   try {
     return JSON.parse(body) as T;
   } catch {
     throw new HttpError(400, "Request body must be valid JSON");
+  }
+}
+
+export async function bounded<T>(
+  operation: Promise<T>,
+  milliseconds = 15_000,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new HttpError(408, "Operation timed out")),
+          milliseconds,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
